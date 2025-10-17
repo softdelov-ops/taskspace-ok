@@ -1,0 +1,13 @@
+# Node
+node_modules/
+.env
+.env.local
+
+# Firebase
+.firebase/
+functions/node_modules/
+functions/.env
+
+# Vite
+dist/
+.vite/
