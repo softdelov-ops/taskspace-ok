@@ -1,0 +1,144 @@
+/*
+  =====================================
+  1. Variables de Color y Tipografía
+  =====================================
+*/
+:root {
+    --color-primary: #5a5be7; /* Azul/Violeta moderno para acentos */
+    --color-secondary: #f4f5f9; /* Fondo muy claro */
+    --color-text: #333;
+    --color-text-light: #777;
+    --color-shadow: rgba(0, 0, 0, 0.05);
+    --border-radius-lg: 12px;
+}
+
+/*
+  =====================================
+  2. Estilos Globales
+  =====================================
+*/
+body {
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background-color: var(--color-secondary);
+    color: var(--color-text);
+    padding-bottom: 50px; /* Espacio al final de la página */
+}
+
+h2 {
+    font-weight: 600;
+    font-size: 1.75rem;
+    color: var(--color-text);
+    margin-bottom: 1.5rem;
+}
+
+/*
+  =====================================
+  3. Navegación (Navbar)
+  =====================================
+*/
+.navbar {
+    background-color: #ffffff !important; /* Fondo blanco puro */
+    box-shadow: 0 2px 10px var(--color-shadow);
+    z-index: 1000;
+}
+
+.navbar-brand {
+    font-size: 1.5rem;
+    color: var(--color-primary) !important;
+}
+
+#login-btn {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    transition: all 0.2s ease;
+}
+
+#login-btn:hover {
+    background-color: var(--color-primary);
+    color: #fff;
+}
+
+
+/*
+  =====================================
+  4. Componente de Notificaciones
+  =====================================
+*/
+#notifications {
+    display: flex; /* Usamos flex para centrar el botón */
+    justify-content: flex-end;
+}
+
+#notifications .btn-light {
+    background-color: #fff;
+    border: none;
+    box-shadow: 0 4px 10px var(--color-shadow);
+    border-radius: 50%; /* Botón redondo */
+    width: 45px;
+    height: 45px;
+    padding: 0;
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease;
+}
+
+#notifications .btn-light:hover {
+    transform: translateY(-2px);
+}
+
+#notif-count {
+    font-size: 0.7rem;
+    padding: 0.3em 0.6em;
+}
+
+/*
+  =====================================
+  5. Contenedores de Tareas
+  =====================================
+*/
+#pending-tasks,
+#completed-tasks {
+    display: grid;
+    gap: 15px; /* Espacio entre las tarjetas */
+    /* Estilo para que se vea vacío y moderno */
+    min-height: 100px; 
+    padding: 1px; /* Pequeño truco para que los contenedores no colapsen */
+}
+
+/*
+  =====================================
+  6. Tarjeta de Tarea (Simulada)
+  
+  Nota: Estas clases (task-card) las crearás con JS,
+  pero el CSS está listo.
+  =====================================
+*/
+.task-card {
+    background-color: #ffffff;
+    padding: 15px;
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 4px 12px var(--color-shadow);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.3s ease;
+    border-left: 5px solid var(--color-primary);
+}
+
+.task-card.completed {
+    border-left-color: #28a745; /* Verde para completadas */
+    opacity: 0.7;
+    text-decoration: line-through;
+}
+
+.task-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px var(--color-shadow);
+}
+
+.task-title {
+    font-weight: 500;
+    flex-grow: 1;
+}

@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TaskSpace Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
+    
+    <style>
+        body { font-family: 'Roboto', sans-serif;
+ background-color: #f0f2f5; }
+        
+        /* Colores de Prioridad */
+        .priority-color-urgente { color: #dc3545 !important;
+ font-weight: bold; }
+        .priority-color-alta { color: #fd7e14 !important; font-weight: bold;
+ }
+        .priority-color-media { color: #0d6efd !important; font-weight: bold;
+ }
+        .priority-color-baja { color: #6c757d !important; font-weight: bold;
+ }
+        
+        #taskPriority, #taskPriority option { font-weight: bold;
+ }
+
+        /* Estilos de Tarjeta */
+        .task-card { 
+            transition: all 0.2s ease-in-out;
+ border-radius: 12px; 
+            border: 0; 
+            background: white;
+        }
+        .task-card:hover { transform: translateY(-3px);
+ box-shadow: 0 .5rem 1rem rgba(0,0,0,.10)!important; }
+        
+        /* Bordes laterales por prioridad */
+        .task-card.border-danger { border-left: 5px solid #dc3545 !important;
+ } 
+        .task-card.border-warning { border-left: 5px solid #fd7e14 !important;
+ } 
+        .task-card.border-info { border-left: 5px solid #0d6efd !important;
+ } 
+        .task-card.border-secondary { border-left: 5px solid #6c757d !important;
+ }
+        .task-card.border-success { border-left: 5px solid #198754 !important;
+ }
+
+        /* Estilo Tarea Completada */
+        .task-card.completed { opacity: 0.8;
+ background-color: #f8f9fa; }
+        .task-card.completed .card-title { text-decoration: line-through; color: #6c757d;
+ }
+        .task-card.bg-light { background-color: #e2e6ea !important;
+ } /* Selección */
+        
+        /* Utilidades */
+        .d-none-auth { display: none !important;
+ }
+        .cursor-pointer { cursor: pointer;
+ }
+        .task-info-small { font-size: 0.75rem; color: #adb5bd;
+ }
+        .task-info-small.text-success { color: #198754 !important;
+ }
+
+        /* Dropdown de Notificaciones */
+        .notification-dropdown-menu {
+            width: 360px;
+ max-height: 450px;
+            overflow-y: auto;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            border: none;
+            z-index: 2000;
+ }
+        .notification-item { border-bottom: 1px solid #f0f0f0; padding: 12px 20px; transition: background 0.2s;
+ }
+        .notification-item:hover { background-color: #f8f9fa;
+ }
+
+        /* Barra de Acción Masiva */
+        #bulk-action-bar { z-index: 1060;
+ border-top-left-radius: 16px; border-top-right-radius: 16px; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm px-4 sticky-top">
+        <div class="container-fluid">
+            <span class="navbar-brand fw-bold text-primary fs-4"><i class="bi bi-check-circle-fill"></i> TaskSpace</span>
+            
+            <div id="auth-section" class="d-flex align-items-center ms-auto">
+                <div id="notifications-area" class="dropdown me-4 d-none-auth">
+     
+                 <button id="notification-bell" class="btn btn-light position-relative rounded-circle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Alertas">
+                        <i class="bi bi-bell text-secondary" style="font-size: 1.3rem;"></i>
+                        <span id="notif-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light" style="display: none;">0</span>
+          
+            </button>
+                    <ul class="dropdown-menu dropdown-menu-end notification-dropdown-menu" aria-labelledby="notification-bell">
+                        <li class="dropdown-header bg-white fw-bold text-uppercase small py-2 border-bottom">Alertas de Vencimiento</li>
+                        <div id="notification-list-content">
+        
+                      </div>
+                    </ul>
+                </div>
+                
+                <div id="user-profile-area" class="dropdown d-none-auth">
+         
+               <button class="btn btn-white border shadow-sm btn-sm dropdown-toggle d-flex align-items-center gap-2 rounded-pill px-3 py-1" type="button" id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-person-circle fs-5 text-secondary"></i>
+                        <span id="user-display-name" class="fw-bold d-none d-sm-inline text-dark">Usuario</span>
+                
+      </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2" aria-labelledby="profileDropdown">
+                        <li><button class="dropdown-item py-2" id="open-profile-settings"><i class="bi bi-gear me-2"></i> Configuración</button></li>
+                        <li><hr class="dropdown-divider"></li>
+              
+            <li><button class="dropdown-item py-2 text-danger" id="logout-btn"><i class="bi bi-box-arrow-right me-2"></i> Cerrar sesión</button></li>
+                    </ul>
+                </div>
+                
+                <button id="login-btn" class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm">Iniciar sesión</button>
+     
+         </div>
+        </div>
+    </nav>
+
+    <main class="container py-4" id="task-section" style="display: none;">
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-white rounded-3 shadow-sm border-start border-4 border-primary">
+                    <h5 class="mb-0 
+ fw-bold text-dark" id="pendingTasksHeader">Pendientes (0)</h5>
+                    <div>
+                        <button class="btn btn-light btn-sm rounded-circle me-1" data-bs-toggle="modal" data-bs-target="#settingsModal" data-list-type="pending" title="Ordenar/Preferencias">
+                            <i class="bi bi-sliders"></i>
+              
+            </button>
+                        <button id="add-task-btn" class="btn btn-primary btn-sm rounded-circle shadow-sm" style="width: 32px;
+ height: 32px;" data-bs-toggle="modal" data-bs-target="#taskModal" title="Nueva Tarea">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
+                    </div>
+                </div>
+     
+               
+                <div class="mb-3 d-flex align-items-center px-2">
+                    <div class="form-check me-3">
+                        <input class="form-check-input bulk-checkbox" type="checkbox" id="selectAllPending">
+                   
+           <label class="form-check-label text-muted small user-select-none" for="selectAllPending">Seleccionar todo</label>
+                    </div>
+                    <div class="ms-auto d-flex align-items-center gap-2">
+                        <select id="selectPendientes" class="form-select form-select-sm border-0 bg-transparent text-end fw-bold text-secondary" style="width: auto;
+ cursor: pointer;">
+                            <option value="none">Mostrar todo</option>
+                            <option value="priority">Por Prioridad</option>
+                            <option value="dateRange">Vencimiento</option> 
+         
+                     <option value="name">Por Nombre</option>
+                        </select>
+                        <div id="filterInputContainerPending" class="d-flex align-items-center gap-2"></div>
+                        <button id="applyFilterPendingBtn" class="btn 
+ btn-sm btn-outline-secondary rounded-circle" style="display: none;" onclick="applyFilter(event)"><i class="bi bi-search"></i></button>
+                    </div>
+                </div>
+                 
+                <div id="pending-tasks"></div>
+                <div id="pending-pagination-container" class="pagination-container d-flex justify-content-center mt-3"></div>
+  
+            </div>
+
+            <div class="col-md-6 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-white rounded-3 shadow-sm border-start border-4 border-success">
+                    <h5 class="mb-0 fw-bold text-dark" id="completedTasksHeader">Completadas (0)</h5>
+                    <button class="btn btn-light btn-sm 
+ rounded-circle" data-bs-toggle="modal" data-bs-target="#settingsModal" data-list-type="completed" title="Ordenar/Preferencias">
+                        <i class="bi bi-sliders"></i>
+                    </button>
+                </div>
+
+                <div class="mb-3 d-flex align-items-center px-2">
+              
+           <div class="form-check me-3">
+                        <input class="form-check-input bulk-checkbox" type="checkbox" id="selectAllCompleted">
+                        <label class="form-check-label text-muted small user-select-none" for="selectAllCompleted">Seleccionar todo</label>
+                    </div>
+              
+           <div class="ms-auto d-flex align-items-center gap-2">
+                        <select id="selectCompletadas" class="form-select form-select-sm border-0 bg-transparent text-end fw-bold text-secondary" style="width: auto;
+ cursor: pointer;">
+                            <option value="none">Mostrar todo</option>
+                            <option value="dateRange">Finalización</option>
+                            <option value="priority">Por Prioridad</option>
+          
+                   <option value="name">Por Nombre</option>
+                        </select>
+                         <div id="filterInputContainerCompleted" class="d-flex align-items-center gap-2"></div>
+                        <button id="applyFilterCompletedBtn" class="btn 
+ btn-sm btn-outline-secondary rounded-circle" style="display: none;" onclick="applyFilter(event)"><i class="bi bi-search"></i></button>
+                    </div>
+                </div>
+                
+                <div id="completed-tasks"></div>
+                <div id="completed-pagination-container" class="pagination-container d-flex justify-content-center mt-3"></div>
+   
+           </div>
+        </div>
+    </main>
+    
+    <div class="modal fade" id="taskModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg rounded-4">
+                <div class="modal-header bg-primary text-white border-0 rounded-top-4">
+                   
+   <h5 class="modal-title fw-bold" id="taskModalLabel"><i class="bi bi-pencil-square me-2"></i>Detalles de Tarea</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <form id="newTaskForm">
+            
+             <input type="hidden" id="taskID" value=""> 
+                        <div class="mb-3">
+                            <label class="form-label text-secondary small fw-bold">TÍTULO DE LA TAREA</label> 
+                       
+           <input type="text" class="form-control form-control-lg bg-light" id="taskName" required maxlength="100" placeholder="Ej: Pagar servicios">
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-7">
+      
+                              <label class="form-label text-secondary small fw-bold">FECHA DE VENCIMIENTO</label>
+                                <input type="datetime-local" class="form-control" id="taskDateTime" required> 
+                            </div>
+   
+                           <div class="col-md-5">
+                                <label class="form-label text-secondary small fw-bold">PRIORIDAD</label>
+                                <select class="form-select" id="taskPriority">
+    
+                                 <option value="urgente" class="priority-color-urgente">🔥 Urgente</option>
+                                    <option value="alta" class="priority-color-alta">⬆️ Alta</option>
+                          
+           <option value="media" selected class="priority-color-media">⏺️ Media</option>
+                                    <option value="baja" class="priority-color-baja">⬇️ Baja</option>
+                                </select>
+               
+               </div>
+                        </div>
+                        
+                        <div class="mb-3 mt-3">
+             
+                             <label class="form-label text-secondary small fw-bold">NOTAS ADICIONALES</label>
+                             <textarea class="form-control bg-light" id="taskNotes" rows="3" placeholder="Descripción opcional..."></textarea>
+                        </div>
+
+                    
+         <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-warning fw-bold px-4 shadow-sm" id="readOnlyUncompleteBtn" style="display:none;"><i class="bi bi-arrow-counterclockwise me-1"></i> Desmarcar</button>
+                            <button type="button" class="btn btn-danger fw-bold px-4 shadow-sm" id="readOnlyDeleteBtn" style="display:none;"><i class="bi bi-trash me-1"></i> Eliminar</button>
+
+            
+                             <button type="button" class="btn btn-light text-muted fw-bold" data-bs-dismiss="modal">Cancelar</button>
+
+                            <button type="submit" class="btn btn-primary fw-bold px-4 shadow-sm" id="saveTaskBtn">Guardar Tarea</button>
+                        </div>
+                  
+      </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow">
+                <div class="modal-header 
+ border-0 pb-0">
+                    <h6 class="modal-title fw-bold text-secondary">Preferencias de Lista</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body pt-2" id="settings-content">
+                
+      </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="profileSettingsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content rounded-4 border-0 shadow">
+                <div class="modal-header border-0">
+               
+             <h5 class="modal-title fw-bold"><i class="bi bi-gear-fill me-2 text-primary"></i>Configuración</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body px-4 pb-4">
+                    <form id="profileSettingsForm">
+          
+                      <div class="mb-4">
+                            <h6 class="fw-bold text-dark mb-3">🔔 Alertas en la Campana</h6>
+                            
+                       
+           <div class="card bg-light border-0 mb-3 rounded-3">
+                                <div class="card-body">
+                                    <div class="form-check form-switch d-flex align-items-center justify-content-between ps-0 mb-2">
+              
+                              <label class="form-check-label fw-bold cursor-pointer" for="bellEnabled">Activar Alertas</label>
+                                        <input class="form-check-input ms-2" type="checkbox" id="bellEnabled" style="cursor: pointer;">
+                     
+                 </div>
+                                    
+                                    <div id="bellConfigContainer" class="mt-3 border-top pt-3" style="display: none;">
+       
+                                         <label class="form-label small text-muted mb-1">Avisarme con una anticipación de:</label>
+                                        <div class="input-group">
+                  
+                              <input type="number" class="form-control" id="bellValue" min="1" value="1">
+                                            <select class="form-select bg-white" id="bellUnit" style="flex: 2;">
+                    
+                                 <option value="m">Minuto(s)</option>
+                                                <option value="h" selected>Hora(s)</option>
+                     
+                            <option value="d">Día(s)</option>
+                                                <option value="w">Semana(s)</option>
+                       
+                          <option value="mo">Mes(es)</option>
+                                            </select>
+                              
+           </div>
+                                    </div>
+                                </div>
+                      
+             </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h6 class="fw-bold text-dark mb-3">📧 Resumen de Tareas por Email</h6>
+                            
+                            <div class="card bg-light border-0 mb-3 rounded-3">
+                                <div class="card-body">
+                                    <div class="form-check form-switch d-flex align-items-center justify-content-between ps-0 mb-2">
+                                        <label class="form-check-label fw-bold cursor-pointer" for="emailSummaryEnabled">Activar Resumen</label>
+                                        <input class="form-check-input ms-2" type="checkbox" id="emailSummaryEnabled" style="cursor: pointer;">
+                                    </div>
+                                    
+                                    <div id="emailSummaryConfigContainer" class="mt-3 border-top pt-3" style="display: none;">
+                                        <label class="form-label small text-muted mb-1">Frecuencia de envío:</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-white">Cada</span>
+                                            <input type="number" class="form-control" id="emailSummaryValue" min="1" value="1">
+                                            <select class="form-select bg-white" id="emailSummaryUnit" style="flex: 2;">
+                                                <option value="m">Minuto(s)</option>
+                                                <option value="h">Hora(s)</option>
+                                                <option value="d" selected>Día(s)</option>
+                                                <option value="mo">Mes(es)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+               
+                     <div class="text-end pt-2">
+                            <button type="button" class="btn btn-link text-decoration-none text-muted me-2" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary px-4 fw-bold rounded-pill">Guardar Cambios</button>
+                   
+             </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="bulk-action-bar" class="fixed-bottom bg-dark text-white p-3 shadow-lg" style="display: none;">
+        <div class="container d-flex justify-content-between align-items-center">
+           
+   <span id="selected-count" class="fw-bold small text-white-50">0 seleccionadas</span>
+            <div>
+                <button id="bulk-complete-btn" class="btn btn-sm btn-success me-2 fw-bold" disabled><i class="bi bi-check-lg me-1"></i> Completar</button>
+                <button id="bulk-uncomplete-btn" class="btn btn-sm btn-warning me-2 fw-bold" disabled><i class="bi bi-arrow-counterclockwise me-1"></i> Desmarcar</button>
+                <button id="bulk-delete-btn" class="btn btn-sm btn-danger fw-bold" disabled><i class="bi bi-trash me-1"></i> Eliminar</button>
+  
+           </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    
+    <script>
+        // ******************************************************
+        // 1. CONFIGURACIÓN E INICIALIZACIÓN
+        // ******************************************************
+        const firebaseConfig = {
+            // Reemplaza con tu configuración de Firebase
+            apiKey: "AIzaSyCoArAyVAaAbOhe-oYos3j2mf0b_xUHBGs", 
+            authDomain: "taskspace-ok.firebaseapp.com", 
+            databaseURL: "https://taskspace-ok-default-rtdb.firebaseio.com",
+            projectId: "taskspace-ok",
+            storageBucket: "taskspace-ok.firebasestorage.app", 
+            messagingSenderId: "253102853621",
+            appId: "1:253102853621:web:d4ea7bd5951dbe04a4a4bc"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // ******************************************************
+        // 2. VARIABLES GLOBALES Y DOM
+        // ******************************************************
+        let firebaseUser = null;
+        let tasks = [];
+        let unsubscribeTasks = null;
+        const PENDING_SORT_KEY = 'taskspace_pending_sort';
+        const PENDING_PER_PAGE_KEY = 'taskspace_pending_per_page';
+        const COMPLETED_SORT_KEY = 'taskspace_completed_sort';
+        const COMPLETED_PER_PAGE_KEY = 'taskspace_completed_per_page';
+
+        let pendingSort = localStorage.getItem(PENDING_SORT_KEY) || 'priorityAscDateAsc';
+        let completedSort = localStorage.getItem(COMPLETED_SORT_KEY) || 'completedDateDesc';
+        let pendingItemsPerPage = parseInt(localStorage.getItem(PENDING_PER_PAGE_KEY)) || 10;
+        let completedItemsPerPage = parseInt(localStorage.getItem(COMPLETED_PER_PAGE_KEY)) || 10;
+
+        let pendingCurrentPage = 1;
+        let completedCurrentPage = 1;
+
+        let pendingFilter = { type: 'none', value: '', start: null, end: null };
+        let completedFilter = { type: 'none', value: '', start: null, end: null };
+
+        let bulkSelection = new Set();
+        let userSettings = {};
+
+        const els = {
+            loginBtn: document.getElementById('login-btn'),
+            logoutBtn: document.getElementById('logout-btn'),
+            userProfileArea: document.getElementById('user-profile-area'),
+            taskSection: document.getElementById('task-section'),
+            notificationsArea: document.getElementById('notifications-area'),
+            notifBell: document.getElementById('notification-bell'),
+            notifList: document.getElementById('notification-list-content'),
+            notifCount: document.getElementById('notif-count'),
+            bulkBar: document.getElementById('bulk-action-bar'),
+            taskModal: document.getElementById('taskModal'),
+            newTaskForm: document.getElementById('newTaskForm'),
+            profileForm: document.getElementById('profileSettingsForm'),
+            pendingContainer: document.getElementById('pending-tasks'),
+            completedContainer: document.getElementById('completed-tasks'),
+            pendingPaginationContainer: document.getElementById('pending-pagination-container'), 
+            completedPaginationContainer: document.getElementById('completed-pagination-container'), 
+
+            // Configuración de Perfil - Campana
+            bellEnabled: document.getElementById('bellEnabled'),
+            bellValue: document.getElementById('bellValue'),
+            bellUnit: document.getElementById('bellUnit'),
+            bellContainer: document.getElementById('bellConfigContainer'),
+
+            // Configuración de Perfil - Email Summary 
+            emailSummaryEnabled: document.getElementById('emailSummaryEnabled'),
+            emailSummaryValue: document.getElementById('emailSummaryValue'),
+            emailSummaryUnit: document.getElementById('emailSummaryUnit'),
+            emailSummaryContainer: document.getElementById('emailSummaryConfigContainer'),
+
+            // Modales Generales
+            settingsModal: document.getElementById('settingsModal'),
+            settingsContent: document.getElementById('settings-content')
+        };
+
+
+        // ******************************************************
+        // 3. AUTENTICACIÓN
+        // ******************************************************
+        const signIn = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(console.error);
+        const signOut = () => auth.signOut().then(() => { 
+            tasks = []; 
+            if (unsubscribeTasks) unsubscribeTasks(); 
+            updateUIForAuth(); 
+            renderTasks(); 
+        });
+
+        auth.onAuthStateChanged(user => {
+            firebaseUser = user;
+            if (user) loadUserSettings().then(fetchTasks);
+            else {
+                updateUIForAuth();
+                renderTasks();
+            }
+        });
+
+        // ******************************************************
+        // 4. SETTINGS DE USUARIO (FIRESTORE) - CORRECCIÓN 1: Guarda el email
+        // ******************************************************
+        const loadUserSettings = async () => {
+            if (!firebaseUser) return;
+            try {
+                // CORRECCIÓN 1: Asegura que el email se guarda en el documento principal para la Cloud Function
+                await db.collection('users').doc(firebaseUser.uid).set({ 
+                    email: firebaseUser.email, 
+                    displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0]
+                }, { merge: true });
+
+                const ref = db.collection('users').doc(firebaseUser.uid).collection('settings').doc('prefs');
+                const doc = await ref.get();
+                if (doc.exists) {
+                    userSettings = doc.data();
+                } else {
+                    // Configuración por defecto 
+                    userSettings = {
+                        bellEnabled: true, bellValue: 1, bellUnit: 'h',
+                        emailSummaryEnabled: false, 
+                        emailSummaryValue: 1, 
+                        emailSummaryUnit: 'd' 
+                    };
+                    await ref.set(userSettings);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+            updateUIForAuth();
+        };
+
+        const saveUserSettings = async (settings) => {
+            if (!firebaseUser) return;
+            await db.collection('users').doc(firebaseUser.uid).collection('settings').doc('prefs').set(settings, { merge: true });
+            userSettings = { ...userSettings, ...settings };
+            updateNotifications();
+            renderTasks();
+        };
+
+        // ******************************************************
+        // 5. GESTIÓN DE TAREAS (CRUD FIRESTORE)
+        // ******************************************************
+        const fetchTasks = () => {
+            if (unsubscribeTasks) unsubscribeTasks();
+
+            const ref = db.collection('users').doc(firebaseUser.uid).collection('tasks');
+            unsubscribeTasks = ref.onSnapshot(snap => {
+                tasks = snap.docs.map(doc => {
+                    const d = doc.data();
+                    return {
+                        id: doc.id,
+                        name: d.name,
+                        dateTime: d.dateTime ? d.dateTime.toDate() : null,
+                        priority: d.priority,
+                        notes: d.notes || '',
+                        isCompleted: d.isCompleted || false,
+                        completedAt: d.completedAt ? d.completedAt.toDate() : null,
+                        createdAt: d.createdAt ? d.createdAt.toDate() : new Date()
+                    };
+                });
+                renderTasks();
+                updateNotifications();
+            });
+        };
+
+        const saveTask = async (data) => {
+            const ref = db.collection('users').doc(firebaseUser.uid).collection('tasks');
+            const payload = {
+                ...data,
+                dateTime: data.dateTime ? firebase.firestore.Timestamp.fromDate(data.dateTime) : null,
+                completedAt: data.completedAt ? firebase.firestore.Timestamp.fromDate(data.completedAt) : null,
+                createdAt: data.createdAt ? firebase.firestore.Timestamp.fromDate(data.createdAt) : firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            if (data.id) {
+                await ref.doc(data.id).update(payload);
+            } else {
+                await ref.add(payload);
+            }
+        };
+
+        const toggleComplete = async (id) => {
+            const task = tasks.find(t => t.id === id);
+            if (!task) return;
+            const isCompleted = !task.isCompleted;
+            await db.collection('users').doc(firebaseUser.uid).collection('tasks').doc(id).update({
+                isCompleted: isCompleted,
+                completedAt: isCompleted ? firebase.firestore.Timestamp.fromDate(new Date()) : null
+            });
+            // Reset bulk selection
+            bulkSelection.clear();
+            updateBulkActionBar();
+        };
+
+        const deleteTask = async (id) => {
+            if (confirm('¿Estás seguro de que quieres eliminar esta tarea?')) {
+                await db.collection('users').doc(firebaseUser.uid).collection('tasks').doc(id).delete();
+                // Reset bulk selection
+                bulkSelection.clear();
+                updateBulkActionBar();
+            }
+        };
+        
+        const bulkAction = async (action) => {
+            if (bulkSelection.size === 0) return;
+            const confirmMsg = (action === 'delete') 
+                ? `¿Estás seguro de que quieres ELIMINAR ${bulkSelection.size} tarea(s)?`
+                : `¿Deseas ${action === 'complete' ? 'COMPLETAR' : 'DESMARCAR'} ${bulkSelection.size} tarea(s)?`;
+            
+            if (confirm(confirmMsg)) {
+                const batch = db.batch();
+                const completed = action === 'complete';
+                const completedAt = completed ? firebase.firestore.Timestamp.fromDate(new Date()) : null;
+
+                bulkSelection.forEach(id => {
+                    const docRef = db.collection('users').doc(firebaseUser.uid).collection('tasks').doc(id);
+                    const updateData = (action === 'delete')
+                        ? firebase.firestore.FieldValue.delete() // Para eliminar
+                        : { isCompleted: completed, completedAt: completedAt }; // Para completar/desmarcar
+                    
+                    if (action === 'delete') {
+                        batch.delete(docRef);
+                    } else {
+                        batch.update(docRef, updateData);
+                    }
+                });
+
+                await batch.commit();
+                bulkSelection.clear();
+                updateBulkActionBar();
+                document.getElementById('selectAllPending').checked = false;
+                document.getElementById('selectAllCompleted').checked = false;
+            }
+        };
+
+        // ******************************************************
+        // 6. NOTIFICACIONES
+        // ******************************************************
+        const getPriorityColor = (priority) => {
+            switch (priority) {
+                case 'urgente': return 'danger';
+                case 'alta': return 'warning';
+                case 'media': return 'info';
+                case 'baja': return 'secondary';
+                default: return 'secondary';
+            }
+        };
+        
+        const getPriorityBadge = (priority) => {
+            switch (priority) {
+                case 'urgente': return '<span class="badge bg-danger">🔥 Urgente</span>';
+                case 'alta': return '<span class="badge bg-warning text-dark">⬆️ Alta</span>';
+                case 'media': return '<span class="badge bg-info text-dark">⏺️ Media</span>';
+                case 'baja': return '<span class="badge bg-secondary">⬇️ Baja</span>';
+                default: return '';
+            }
+        };
+
+        const updateNotifications = () => {
+            if (!firebaseUser || !userSettings.bellEnabled) {
+                els.notifCount.style.display = 'none';
+                els.notifList.innerHTML = `<div class="text-center p-4 text-muted small"><i class="bi bi-bell-slash fs-4 d-block mb-2"></i>Notificaciones de Campana Desactivadas</div>`;
+                return;
+            }
+
+            const now = new Date();
+            const alerts = tasks.filter(t => 
+                !t.isCompleted && 
+                t.dateTime && 
+                t.dateTime.getTime() > now.getTime() && 
+                t.dateTime.getTime() < calculateAlertTime(now)
+            ).sort((a, b) => a.dateTime - b.dateTime);
+            
+            const overdue = tasks.filter(t => !t.isCompleted && t.dateTime && t.dateTime.getTime() < now.getTime());
+
+            const alertsAndOverdue = [...overdue.sort((a, b) => b.dateTime - a.dateTime), ...alerts]; // Mostrar vencidas primero
+
+            els.notifCount.textContent = alertsAndOverdue.length > 99 ? '99+' : alertsAndOverdue.length;
+            els.notifCount.style.display = alertsAndOverdue.length > 0 ? 'inline' : 'none';
+
+            els.notifList.innerHTML = '';
+            if (alertsAndOverdue.length === 0) {
+                els.notifList.innerHTML = `<div class="text-center p-4 text-muted small"><i class="bi bi-calendar-check fs-4 d-block mb-2"></i>Todo al día</div>`;
+                return;
+            }
+
+            alertsAndOverdue.forEach(t => {
+                const diff = t.dateTime.getTime() - now.getTime();
+                const isOverdue = diff < 0;
+                const timeString = t.dateTime.toLocaleString('es-ES', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
+                const item = document.createElement('div');
+                item.className = 'notification-item d-flex justify-content-between align-items-center';
+                item.innerHTML = `
+                    <div style="cursor:pointer; flex: 1;" onclick="openEditModal('${t.id}')">
+                        <div class="fw-bold text-dark text-truncate" style="max-width: 200px;">${t.name}</div>
+                        <div class="small ${isOverdue ? 'text-danger fw-bold' : 'text-warning text-darken-3'}">
+                            ${isOverdue ? '<i class="bi bi-exclamation-circle-fill"></i> Vencida: ' : '<i class="bi bi-clock"></i> Vence: '}
+                            ${timeString}
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-success rounded-circle" onclick="toggleComplete('${t.id}')" title="Completar">
+                        <i class="bi bi-check-lg"></i>
+                    </button>
+                `;
+                els.notifList.appendChild(item);
+            });
+        };
+
+        const calculateAlertTime = (now) => {
+            const { bellValue, bellUnit } = userSettings;
+            let multiplier;
+            switch (bellUnit) {
+                case 'm': multiplier = 60000; break;
+                case 'h': multiplier = 3600000; break;
+                case 'd': multiplier = 86400000; break;
+                case 'w': multiplier = 604800000; break;
+                case 'mo': multiplier = 2592000000; break; // 30 days approximation
+                default: return now.getTime();
+            }
+            // Retorna el tiempo (ms) desde ahora + anticipación
+            return now.getTime() + (parseInt(bellValue) * multiplier);
+        };
+
+        window.openEditModal = (taskId) => {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            document.getElementById('taskID').value = task.id;
+            document.getElementById('taskName').value = task.name;
+            document.getElementById('taskNotes').value = task.notes;
+            document.getElementById('taskPriority').value = task.priority;
+
+            if (task.dateTime) {
+                const offset = task.dateTime.getTimezoneOffset() * 60000;
+                const localISOTime = new Date(task.dateTime.getTime() - offset).toISOString().slice(0, 16);
+                document.getElementById('taskDateTime').value = localISOTime;
+            } else {
+                document.getElementById('taskDateTime').value = '';
+            }
+
+            if (task.isCompleted) {
+                // Modo solo lectura para tareas completadas
+                setModalReadOnlyState(true, task.id);
+            } else {
+                // Modo edición/guardar para tareas pendientes
+                setModalReadOnlyState(false);
+            }
+
+            const modal = new bootstrap.Modal(els.taskModal);
+            modal.show();
+        };
+
+        // ******************************************************
+        // 7. RENDERIZADO
+        // ******************************************************
+        const filterTasksAndSort = (list, isCompleted) => {
+            const filter = isCompleted ? completedFilter : pendingFilter;
+            const sortKey = isCompleted ? completedSort : pendingSort;
+
+            // 1. Aplicar Filtros
+            list = list.filter(t => {
+                if (filter.type === 'name') {
+                    if (!filter.value) return true;
+                    return t.name.toLowerCase().includes(filter.value.toLowerCase());
+                }
+                if (filter.type === 'priority') {
+                    if (!filter.value) return true;
+                    return t.priority === filter.value;
+                }
+                // Filtro de Rango de Fecha (Vencimiento para Pendientes, Completado para Completadas)
+                if (filter.type === 'dateRange') {
+                    // Determinar qué campo de fecha usar
+                    const dateField = isCompleted ? t.completedAt : t.dateTime; 
+                    const start = filter.start ? new Date(filter.start).setHours(0, 0, 0, 0) : null;
+                    const end = filter.end ? new Date(filter.end).setHours(23, 59, 59, 999) : null;
+                    const dateFieldValue = dateField ? dateField.getTime() : null;
+
+                    if (dateFieldValue) {
+                        let matches = true;
+                        if (start) matches = matches && dateFieldValue >= start;
+                        if (end) matches = matches && dateFieldValue <= end;
+                        return matches;
+                    }
+                    return false;
+                }
+                return true;
+            });
+
+            // 2. Aplicar Ordenamiento
+            list.sort((a, b) => {
+                // Ordenamiento por defecto de Pendientes (Prioridad + Vencimiento)
+                if (!isCompleted && sortKey === 'priorityAscDateAsc') {
+                    const getPriorityOrder = (p) => {
+                        if (p === 'urgente') return 1;
+                        if (p === 'alta') return 2;
+                        if (p === 'media') return 3;
+                        if (p === 'baja') return 4;
+                        return 5;
+                    };
+                    const pOrderA = getPriorityOrder(a.priority);
+                    const pOrderB = getPriorityOrder(b.priority);
+                    if (pOrderA !== pOrderB) return pOrderA - pOrderB; // Sort by priority
+                    // Fallback to Due Date (earliest first)
+                    const dateA = a.dateTime ? a.dateTime.getTime() : Infinity;
+                    const dateB = b.dateTime ? b.dateTime.getTime() : Infinity;
+                    return dateA - dateB; 
+                }
+                
+                // Ordenamiento por Nombre
+                if (sortKey === 'nameAsc') {
+                    return a.name.localeCompare(b.name);
+                }
+                
+                // Ordenamiento por Creación (Más reciente)
+                if (sortKey === 'createdDesc') {
+                    return b.createdAt - a.createdAt;
+                }
+                
+                // Ordenamiento por Vencimiento (Más cercana/lejana)
+                if (sortKey === 'dateAsc') {
+                    const dateA = a.dateTime ? a.dateTime.getTime() : Infinity;
+                    const dateB = b.dateTime ? b.dateTime.getTime() : Infinity;
+                    return dateA - dateB;
+                }
+                if (sortKey === 'dateDesc') {
+                    const dateA = a.dateTime ? a.dateTime.getTime() : -Infinity;
+                    const dateB = b.dateTime ? b.dateTime.getTime() : -Infinity;
+                    return dateB - dateA;
+                }
+
+                // Ordenamiento de Completadas (Más reciente/antigua)
+                if (isCompleted && sortKey === 'completedDateDesc') {
+                    const dateA = a.completedAt ? a.completedAt.getTime() : -Infinity;
+                    const dateB = b.completedAt ? b.completedAt.getTime() : -Infinity;
+                    return dateB - dateA;
+                }
+                if (isCompleted && sortKey === 'completedDateAsc') {
+                    const dateA = a.completedAt ? a.completedAt.getTime() : Infinity;
+                    const dateB = b.completedAt ? b.completedAt.getTime() : Infinity;
+                    return dateA - dateB;
+                }
+
+                // Si no hay sortKey específico, usar el valor por defecto
+                return 0;
+            });
+
+            return list;
+        };
+
+        const renderTasks = () => {
+            if (!firebaseUser) {
+                els.pendingContainer.innerHTML = '<div class="alert alert-info text-center mt-4">Inicia sesión para ver tus tareas.</div>';
+                els.completedContainer.innerHTML = '<div class="alert alert-info text-center mt-4">Inicia sesión para ver tus tareas.</div>';
+                document.getElementById('pendingTasksHeader').textContent = `Pendientes (0)`;
+                document.getElementById('completedTasksHeader').textContent = `Completadas (0)`;
+                return;
+            }
+
+            const allPendingTasks = tasks.filter(t => !t.isCompleted);
+            const allCompletedTasks = tasks.filter(t => t.isCompleted);
+            
+            // Aplicar filtro y ordenamiento a las listas completas
+            const pendingTasks = filterTasksAndSort(allPendingTasks, false);
+            const completedTasks = filterTasksAndSort(allCompletedTasks, true);
+
+
+            document.getElementById('pendingTasksHeader').textContent = `Pendientes (${pendingTasks.length})`;
+            document.getElementById('completedTasksHeader').textContent = `Completadas (${completedTasks.length})`;
+
+            // Renderizar Pendientes
+            renderList(pendingTasks, els.pendingContainer, els.pendingPaginationContainer, pendingItemsPerPage, pendingCurrentPage, false);
+
+            // Renderizar Completadas
+            renderList(completedTasks, els.completedContainer, els.completedPaginationContainer, completedItemsPerPage, completedCurrentPage, true);
+        };
+
+        const renderList = (taskList, containerEl, paginationContainerEl, itemsPerPage, currentPage, isCompleted) => {
+            const list = taskList; // taskList ya viene filtrada y ordenada desde renderTasks
+            const totalPages = Math.ceil(list.length / itemsPerPage);
+            const start = (currentPage - 1) * itemsPerPage;
+            const paginatedList = list.slice(start, start + itemsPerPage);
+
+            containerEl.innerHTML = '';
+            if (paginatedList.length === 0) {
+                containerEl.innerHTML = `<div class="alert alert-light text-center mt-4"><i class="bi bi-list-check fs-4 d-block mb-2"></i>No hay tareas ${isCompleted ? 'completadas' : 'pendientes'} para mostrar.</div>`;
+            } else {
+                paginatedList.forEach(task => {
+                    containerEl.appendChild(renderTaskCard(task));
+                });
+            }
+
+            renderPagination(paginationContainerEl, totalPages, currentPage, isCompleted);
+        };
+        
+        const renderTaskCard = (task) => {
+            const isSelected = bulkSelection.has(task.id);
+            const div = document.createElement('div');
+            
+            // Formateador de fecha
+            const fmt = (d) => d ? d.toLocaleString('es-ES', {day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'}) : '';
+            const dueStr = fmt(task.dateTime);
+            const createdStr = fmt(task.createdAt);
+            const completedStr = fmt(task.completedAt);
+            
+            const border = task.isCompleted ? 'border-success' : `border-${getPriorityColor(task.priority)}`;
+            const priorityBadge = getPriorityBadge(task.priority);
+
+            // Contenido del pie de tarjeta (Footer) con Creada, Vencimiento y Finalizada en la misma línea
+            const footerDates = `
+                <small class="task-info-small"><i class="bi bi-clock-history me-1"></i>Creada: ${createdStr}</small>
+                ${!task.isCompleted && task.dateTime ?
+                    `<small class="task-info-small ms-3 fw-bold text-dark"><i class="bi bi-calendar-event me-1"></i>Vence: ${dueStr}</small>` : ''
+                }
+                ${task.isCompleted ?
+                    `<small class="task-info-small ms-3 text-success fw-bold"><i class="bi bi-check2-all me-1"></i>Finalizada: ${completedStr}</small>` : ''
+                }
+            `;
+
+            div.className = `task-card card mb-3 shadow-sm ${border} ${task.isCompleted ? 'completed' : ''} ${isSelected ? 'bg-light' : ''}`;
+            div.innerHTML = `
+                <div class="card-body p-3 d-flex align-items-start">
+                    <div class="form-check me-3 mt-1">
+                        <input class="form-check-input bulk-checkbox cursor-pointer" type="checkbox" data-id="${task.id}" data-completed="${task.isCompleted}" ${isSelected ? 'checked' : ''} onclick="toggleBulkCheckbox('${task.id}', event)">
+                    </div>
+                    <div class="flex-grow-1" onclick="openEditModal('${task.id}')" style="cursor: pointer;">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <h6 class="card-title fw-bold text-dark mb-1 flex-grow-1 me-2" style="word-break: break-word;">
+                                ${task.name}
+                            </h6>
+                            <div class="flex-shrink-0">
+                                ${priorityBadge}
+                            </div>
+                        </div>
+                        <p class="card-text small text-muted mb-2 text-truncate" style="max-width: 100%;">${task.notes || 'Sin notas.'}</p>
+                        <div class="d-flex align-items-center flex-wrap gap-2">
+                            ${footerDates}
+                        </div>
+                    </div>
+                    ${!task.isCompleted ? `
+                        <button class="btn btn-sm btn-outline-success ms-3 flex-shrink-0" onclick="toggleComplete('${task.id}')" title="Marcar como completada">
+                            <i class="bi bi-check-lg"></i>
+                        </button>` : ''
+                    }
+                </div>
+            `;
+            return div;
+        };
+        
+        const renderPagination = (containerEl, totalPages, currentPage, isCompleted) => {
+            containerEl.innerHTML = '';
+            if (totalPages <= 1) return;
+
+            const listType = isCompleted ? 'completed' : 'pending';
+            const ul = document.createElement('ul');
+            ul.className = 'pagination pagination-sm shadow-sm';
+
+            // Botón 'Anterior'
+            let prevClass = currentPage === 1 ? 'disabled' : '';
+            ul.innerHTML += `<li class="page-item ${prevClass}"><a class="page-link cursor-pointer" onclick="changePage('${listType}', ${currentPage - 1})">Anterior</a></li>`;
+
+            // Botones de página
+            const maxPagesToShow = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxPagesToShow / 2));
+            let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+            if (endPage - startPage + 1 < maxPagesToShow) {
+                startPage = Math.max(1, endPage - maxPagesToShow + 1);
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                let activeClass = i === currentPage ? 'active' : '';
+                ul.innerHTML += `<li class="page-item ${activeClass}"><a class="page-link cursor-pointer" onclick="changePage('${listType}', ${i})">${i}</a></li>`;
+            }
+
+
+            // Botón 'Siguiente'
+            let nextClass = currentPage === totalPages ? 'disabled' : '';
+            ul.innerHTML += `<li class="page-item ${nextClass}"><a class="page-link cursor-pointer" onclick="changePage('${listType}', ${currentPage + 1})">Siguiente</a></li>`;
+
+            containerEl.appendChild(ul);
+        };
+        
+        window.changePage = (listType, newPage) => {
+            const totalTasks = (listType === 'pending' 
+                ? filterTasksAndSort(tasks.filter(t => !t.isCompleted), false)
+                : filterTasksAndSort(tasks.filter(t => t.isCompleted), true)
+            ).length;
+            
+            const itemsPerPage = listType === 'pending' ? pendingItemsPerPage : completedItemsPerPage;
+            const totalPages = Math.ceil(totalTasks / itemsPerPage);
+
+            if (newPage < 1 || newPage > totalPages) return;
+
+            if (listType === 'pending') {
+                pendingCurrentPage = newPage;
+            } else {
+                completedCurrentPage = newPage;
+            }
+            renderTasks();
+            window.scrollTo(0, 0); // Opcional: scroll al inicio de la página
+        };
+
+        // ******************************************************
+        // 8. FILTROS DINÁMICOS
+        // ******************************************************
+        const updateFilterUI = (isCompleted) => {
+            const selectEl = isCompleted ? document.getElementById('selectCompletadas') : document.getElementById('selectPendientes');
+            const containerEl = isCompleted ? document.getElementById('filterInputContainerCompleted') : document.getElementById('filterInputContainerPending');
+            const filterBtn = isCompleted ? document.getElementById('applyFilterCompletedBtn') : document.getElementById('applyFilterPendingBtn');
+            const listFilter = isCompleted ? completedFilter : pendingFilter;
+            const filterType = selectEl.value;
+
+            containerEl.innerHTML = '';
+            filterBtn.style.display = 'none';
+            containerEl.style.width = 'auto'; // Reset width
+            const inputIdPrefix = isCompleted ? 'Completed' : 'Pending';
+
+            // Etiqueta más simple para el rango de fechas
+            const dateLabel = isCompleted ? 'Finalización' : 'Vencimiento';
+
+            if (filterType === 'name') {
+                containerEl.innerHTML = `<input type="text" id="filterInputName${inputIdPrefix}" class="form-control form-control-sm" placeholder="Buscar nombre..." value="${listFilter.value}">`;
+                filterBtn.style.display = 'block';
+                containerEl.style.width = '150px';
+            } 
+            // Filtro de Prioridad (para ambas listas)
+            else if (filterType === 'priority') {
+                containerEl.innerHTML = `
+                    <select id="filterInputPriority${inputIdPrefix}" class="form-select form-select-sm" onchange="applyFilter(event)">
+                        <option value="">Todas</option>
+                        <option value="urgente" class="priority-color-urgente" ${listFilter.value === 'urgente' ? 'selected' : ''}>Urgente</option>
+                        <option value="alta" class="priority-color-alta" ${listFilter.value === 'alta' ? 'selected' : ''}>Alta</option>
+                        <option value="media" class="priority-color-media" ${listFilter.value === 'media' ? 'selected' : ''}>Media</option>
+                        <option value="baja" class="priority-color-baja" ${listFilter.value === 'baja' ? 'selected' : ''}>Baja</option>
+                    </select>`;
+                containerEl.style.width = '120px';
+            } 
+            // Filtro de Rango de Fecha
+            else if (filterType === 'dateRange') {
+                const startDateValue = listFilter.start ? listFilter.start.substring(0, 10) : '';
+                const endDateValue = listFilter.end ? listFilter.end.substring(0, 10) : '';
+
+                containerEl.innerHTML = `
+                    <input type="date" id="filterInputStart${inputIdPrefix}" class="form-control form-control-sm" title="Inicio de ${dateLabel}" value="${startDateValue}">
+                    <span class="text-muted mx-1">a</span>
+                    <input type="date" id="filterInputEnd${inputIdPrefix}" class="form-control form-control-sm" title="Fin de ${dateLabel}" value="${endDateValue}">
+                `;
+                filterBtn.style.display = 'block';
+                containerEl.style.width = '240px';
+            }
+
+            // Si el filtro se cambia a "Mostrar todo", reiniciar el filtro en las variables
+            if (filterType === 'none') {
+                if (isCompleted) completedFilter = { type: 'none', value: '', start: null, end: null };
+                else pendingFilter = { type: 'none', value: '', start: null, end: null };
+                renderTasks();
+            }
+        };
+
+        window.applyFilter = (e) => {
+            const isCompleted = e.target.closest('#completed-tasks, #applyFilterCompletedBtn, #selectCompletadas') !== null;
+            const inputIdPrefix = isCompleted ? 'Completed' : 'Pending';
+            let newFilter = { type: 'none', value: '', start: null, end: null };
+            const filterType = isCompleted ? document.getElementById('selectCompletadas').value : document.getElementById('selectPendientes').value;
+
+            newFilter.type = filterType;
+
+            if (filterType === 'name') {
+                newFilter.value = document.getElementById(`filterInputName${inputIdPrefix}`).value.trim();
+            } else if (filterType === 'priority') {
+                newFilter.value = document.getElementById(`filterInputPriority${inputIdPrefix}`).value;
+            } else if (filterType === 'dateRange') {
+                newFilter.start = document.getElementById(`filterInputStart${inputIdPrefix}`).value || null;
+                newFilter.end = document.getElementById(`filterInputEnd${inputIdPrefix}`).value || null;
+            }
+
+            if (isCompleted) completedFilter = newFilter;
+            else pendingFilter = newFilter;
+
+            // Resetear la página a 1 después de aplicar el filtro
+            if (isCompleted) completedCurrentPage = 1;
+            else pendingCurrentPage = 1;
+
+            renderTasks();
+        };
+
+        // Listeners para Select de Filtros (Actualizan la UI)
+        document.getElementById('selectPendientes').addEventListener('change', () => updateFilterUI(false));
+        document.getElementById('selectCompletadas').addEventListener('change', () => updateFilterUI(true));
+
+        // Llamadas iniciales para configurar los filtros al cargar
+        document.addEventListener('DOMContentLoaded', () => {
+             // Retrasado ligeramente para asegurar que la estructura esté lista
+            setTimeout(() => { 
+                updateFilterUI(false); 
+                updateFilterUI(true); 
+            }, 100);
+        });
+
+        // ******************************************************
+        // 9. MODAL DE PREFERENCIAS DE LISTA
+        // ******************************************************
+        const getPendingSortOptions = () => ([
+            { value: 'priorityAscDateAsc', text: 'Prioridad y Vencimiento (Defecto)' },
+            { value: 'dateAsc', text: 'Vencimiento (Más cercana)' },
+            { value: 'dateDesc', text: 'Vencimiento (Más lejana)' },
+            { value: 'nameAsc', text: 'Nombre (A-Z)' },
+            { value: 'createdDesc', text: 'Creación (Más reciente)' }
+        ]);
+
+        const getCompletedSortOptions = () => ([
+            { value: 'completedDateDesc', text: 'Completadas (Más reciente) (Defecto)' },
+            { value: 'completedDateAsc', text: 'Completadas (Más antigua)' },
+            { value: 'nameAsc', text: 'Nombre (A-Z)' }
+        ]);
+
+        const renderSettingsContent = (isCompleted) => {
+            const listType = isCompleted ? 'completed' : 'pending';
+            const currentSort = isCompleted ? completedSort : pendingSort;
+            const currentItemsPerPage = isCompleted ? completedItemsPerPage : pendingItemsPerPage;
+            const sortOptions = isCompleted ? getCompletedSortOptions() : getPendingSortOptions();
+
+            let sortHtml = `<label class="form-label small fw-bold text-muted">ORDENAR POR</label><select class="form-select mb-3" id="sort-select-${listType}">`;
+            sortOptions.forEach(option => {
+                sortHtml += `<option value="${option.value}" ${currentSort === option.value ? 'selected' : ''}>${option.text}</option>`;
+            });
+            sortHtml += '</select>';
+
+            const paginationHtml = `
+                <label class="form-label small fw-bold text-muted mt-2">TAREAS POR PÁGINA</label>
+                <select class="form-select" id="per-page-select-${listType}">
+                    <option value="5" ${currentItemsPerPage === 5 ? 'selected' : ''}>5 tareas</option>
+                    <option value="10" ${currentItemsPerPage === 10 ? 'selected' : ''}>10 tareas (Defecto)</option>
+                    <option value="20" ${currentItemsPerPage === 20 ? 'selected' : ''}>20 tareas</option>
+                    <option value="50" ${currentItemsPerPage === 50 ? 'selected' : ''}>50 tareas</option>
+                </select>
+            `;
+
+            els.settingsContent.innerHTML = sortHtml + paginationHtml + `<div class="mt-4 text-end">
+                <button type="button" class="btn btn-primary fw-bold btn-sm" onclick="saveListSettings(${isCompleted})">Guardar</button>
+            </div>`;
+        };
+
+        window.saveListSettings = (isCompleted) => {
+            const listType = isCompleted ? 'completed' : 'pending';
+            const newSort = document.getElementById(`sort-select-${listType}`).value;
+            const newItemsPerPage = parseInt(document.getElementById(`per-page-select-${listType}`).value);
+
+            if (!isCompleted) {
+                // Guardar ordenamiento
+                pendingSort = newSort;
+                localStorage.setItem(PENDING_SORT_KEY, newSort);
+                // Guardar paginación
+                if (pendingItemsPerPage !== newItemsPerPage) {
+                    pendingItemsPerPage = newItemsPerPage;
+                    localStorage.setItem(PENDING_PER_PAGE_KEY, newItemsPerPage);
+                }
+                pendingCurrentPage = 1; // Reset page on change
+            } else {
+                // Guardar ordenamiento
+                completedSort = newSort;
+                localStorage.setItem(COMPLETED_SORT_KEY, newSort);
+                // Guardar paginación
+                if (completedItemsPerPage !== newItemsPerPage) {
+                    completedItemsPerPage = newItemsPerPage;
+                    localStorage.setItem(COMPLETED_PER_PAGE_KEY, newItemsPerPage);
+                }
+                completedCurrentPage = 1; // Reset page on change
+            }
+            renderTasks();
+            bootstrap.Modal.getInstance(els.settingsModal).hide();
+        };
+
+        els.settingsModal.addEventListener('show.bs.modal', (e) => {
+            const listType = e.relatedTarget.dataset.listType;
+            renderSettingsContent(listType === 'completed');
+        });
+
+        // ******************************************************
+        // 10. MANEJO DE FORMULARIOS Y MODALES
+        // ******************************************************
+        
+        // Nueva función para establecer el modo de lectura/edición del modal
+        const setModalReadOnlyState = (isReadOnly, taskId = null) => {
+            // Select form elements
+            const taskNameEl = document.getElementById('taskName');
+            const taskDateTimeEl = document.getElementById('taskDateTime');
+            const taskPriorityEl = document.getElementById('taskPriority');
+            const taskNotesEl = document.getElementById('taskNotes');
+            // Select buttons
+            const saveBtn = document.getElementById('saveTaskBtn');
+            const uncompleteBtn = document.getElementById('readOnlyUncompleteBtn');
+            const deleteBtn = document.getElementById('readOnlyDeleteBtn');
+            
+            if (isReadOnly) {
+                // 1. Desactivar campos de entrada (Modo Lectura)
+                taskNameEl.setAttribute('readonly', 'readonly');
+                taskDateTimeEl.setAttribute('readonly', 'readonly');
+                taskPriorityEl.setAttribute('disabled', 'disabled');
+                taskNotesEl.setAttribute('readonly', 'readonly');
+                
+                // 2. Ocultar el botón de guardar y mostrar botones de acción
+                saveBtn.style.display = 'none';
+                uncompleteBtn.style.display = 'block';
+                deleteBtn.style.display = 'block';
+                
+                // 3. Configurar acciones de los botones (usando el ID de la tarea)
+                uncompleteBtn.setAttribute('onclick', `toggleComplete('${taskId}'); bootstrap.Modal.getInstance(els.taskModal).hide();`);
+                deleteBtn.setAttribute('onclick', `deleteTask('${taskId}'); bootstrap.Modal.getInstance(els.taskModal).hide();`);
+                
+            } else {
+                // 1. Activar campos de entrada (Modo Edición)
+                taskNameEl.removeAttribute('readonly');
+                taskDateTimeEl.removeAttribute('readonly');
+                taskPriorityEl.removeAttribute('disabled');
+                taskNotesEl.removeAttribute('readonly');
+                
+                // 2. Mostrar el botón de guardar y ocultar botones de acción
+                saveBtn.style.display = 'block';
+                uncompleteBtn.style.display = 'none';
+                deleteBtn.style.display = 'none';
+                
+                // 3. Limpiar acciones de botones de solo lectura
+                uncompleteBtn.removeAttribute('onclick');
+                deleteBtn.removeAttribute('onclick');
+            }
+        };
+
+        // Listener para el guardado de la tarea (Implementa 2 y 3)
+        els.newTaskForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const saveBtn = document.getElementById('saveTaskBtn');
+            saveBtn.disabled = true; // Deshabilitar para prevenir doble-clic
+
+            try {
+                const id = document.getElementById('taskID').value;
+                const originalTask = tasks.find(t => t.id === id);
+
+                const inputDateTimeStr = document.getElementById('taskDateTime').value;
+                const inputDateTime = new Date(inputDateTimeStr);
+
+                let data = {
+                    id: id || null,
+                    name: document.getElementById('taskName').value.trim(),
+                    dateTime: inputDateTime,
+                    priority: document.getElementById('taskPriority').value,
+                    notes: document.getElementById('taskNotes').value.trim(),
+                    isCompleted: originalTask ? originalTask.isCompleted : false,
+                    createdAt: originalTask ? originalTask.createdAt : new Date()
+                };
+
+                // --- Duplicate Validation ---
+                const isDuplicate = tasks.some(t => {
+                    // Ignorar la tarea si es la que se está editando
+                    if (t.id === id) return false; 
+                    
+                    // Solo validar duplicados entre tareas PENDIENTES
+                    if (t.isCompleted) return false;
+
+                    const isNameMatch = t.name.trim() === data.name;
+                    const isPriorityMatch = t.priority === data.priority;
+                    const isNotesMatch = t.notes.trim() === data.notes;
+                    
+                    // Comparación de fecha y hora exacta
+                    const inputDateIso = data.dateTime.toISOString();
+                    const taskDateIso = t.dateTime ? t.dateTime.toISOString() : null;
+                    const isDateMatch = inputDateIso === taskDateIso;
+
+                    // Criterio de duplicado: mismo título, fecha, prioridad y notas
+                    return isNameMatch && isDateMatch && isPriorityMatch && isNotesMatch;
+                });
+
+                if (isDuplicate) {
+                    alert('¡Advertencia! Ya existe una tarea pendiente con el mismo Título, Fecha, Prioridad y Notas. Por favor, modifique un campo.');
+                    return; // Detiene el proceso de guardado
+                }
+
+                // --- Guardar Tarea ---
+                await saveTask(data); 
+
+                // --- Ocultar Modal después de guardar ---
+                bootstrap.Modal.getInstance(els.taskModal).hide();
+                els.newTaskForm.reset();
+
+            } catch (error) {
+                console.error("Error al guardar la tarea:", error);
+                alert("Ocurrió un error al guardar la tarea. Consulta la consola para más detalles.");
+            } finally {
+                saveBtn.disabled = false; // Habilitar el botón siempre
+            }
+        });
+
+        // Listener para la PREPARACIÓN del modal (Fecha mínima, reset)
+        els.taskModal.addEventListener('show.bs.modal', (e) => {
+            const now = new Date();
+            const offset = now.getTimezoneOffset() * 60000;
+            const nowLocal = new Date(now.getTime() - offset).toISOString().slice(0, 16);
+            
+            // 1. Establecer fecha/hora mínima para evitar fechas pasadas
+            document.getElementById('taskDateTime').min = nowLocal;
+
+            // 2. Setup para nueva tarea (si es activado por el botón "Añadir")
+            if(e.relatedTarget && e.relatedTarget.id === 'add-task-btn') {
+                // Asegura el reset completo y habilita el modo edición
+                els.newTaskForm.reset();
+                document.getElementById('taskID').value = '';
+                document.getElementById('taskDateTime').value = nowLocal;
+                setModalReadOnlyState(false); // Asegurar que está en modo edición
+            }
+        });
+        
+        // Listener para enfocar el cursor 
+        els.taskModal.addEventListener('shown.bs.modal', () => { 
+            // Esperar un momento para asegurar que el modal esté completamente visible
+            setTimeout(() => {
+                document.getElementById('taskName').focus(); 
+            }, 100);
+        });
+
+        // ******************************************************
+        // 11. ACCIONES MASIVAS
+        // ******************************************************
+        const updateBulkActionBar = () => {
+            const isVisible = bulkSelection.size > 0;
+            els.bulkBar.style.display = isVisible ? 'block' : 'none';
+            document.getElementById('selected-count').textContent = `${bulkSelection.size} seleccionada(s)`;
+
+            const hasCompleted = Array.from(bulkSelection).some(id => tasks.find(t => t.id === id)?.isCompleted);
+            const hasPending = Array.from(bulkSelection).some(id => !tasks.find(t => t.id === id)?.isCompleted);
+
+            document.getElementById('bulk-complete-btn').disabled = !hasPending;
+            document.getElementById('bulk-uncomplete-btn').disabled = !hasCompleted;
+            document.getElementById('bulk-delete-btn').disabled = false;
+        };
+
+        window.toggleBulkCheckbox = (id, event) => {
+            event.stopPropagation();
+            if (bulkSelection.has(id)) {
+                bulkSelection.delete(id);
+            } else {
+                bulkSelection.add(id);
+            }
+            updateBulkActionBar();
+            renderTasks(); // Para actualizar el estilo 'bg-light'
+        };
+
+        // Select All Listeners
+        document.getElementById('selectAllPending').addEventListener('change', (e) => {
+            const pendingTasks = filterTasksAndSort(tasks.filter(t => !t.isCompleted), false);
+            const checkboxes = document.querySelectorAll('#pending-tasks .bulk-checkbox');
+
+            if (e.target.checked) {
+                pendingTasks.forEach(t => bulkSelection.add(t.id));
+                checkboxes.forEach(cb => cb.checked = true);
+            } else {
+                pendingTasks.forEach(t => bulkSelection.delete(t.id));
+                checkboxes.forEach(cb => cb.checked = false);
+            }
+            updateBulkActionBar();
+            renderTasks();
+        });
+
+        document.getElementById('selectAllCompleted').addEventListener('change', (e) => {
+            const completedTasks = filterTasksAndSort(tasks.filter(t => t.isCompleted), true);
+            const checkboxes = document.querySelectorAll('#completed-tasks .bulk-checkbox');
+
+            if (e.target.checked) {
+                completedTasks.forEach(t => bulkSelection.add(t.id));
+                checkboxes.forEach(cb => cb.checked = true);
+            } else {
+                completedTasks.forEach(t => bulkSelection.delete(t.id));
+                checkboxes.forEach(cb => cb.checked = false);
+            }
+            updateBulkActionBar();
+            renderTasks();
+        });
+
+        // Bulk Action Button Listeners
+        document.getElementById('bulk-complete-btn').addEventListener('click', () => bulkAction('complete'));
+        document.getElementById('bulk-uncomplete-btn').addEventListener('click', () => bulkAction('uncomplete'));
+        document.getElementById('bulk-delete-btn').addEventListener('click', () => bulkAction('delete'));
+
+        // ******************************************************
+        // 12. CONFIGURACIÓN DE PERFIL Y ALERTAS UI - CORRECCIÓN 2: Lógica completa de guardado y validación
+        // ******************************************************
+        
+        document.getElementById('open-profile-settings').addEventListener('click', () => {
+            // Inicializar valores del modal con settings de usuario
+            els.bellEnabled.checked = userSettings.bellEnabled || false;
+            els.bellValue.value = userSettings.bellValue || 1;
+            els.bellUnit.value = userSettings.bellUnit || 'h';
+            
+            els.emailSummaryEnabled.checked = userSettings.emailSummaryEnabled || false;
+            els.emailSummaryValue.value = userSettings.emailSummaryValue || 1;
+            els.emailSummaryUnit.value = userSettings.emailSummaryUnit || 'd';
+            
+            // Mostrar/Ocultar contenedores según el estado inicial de los switches
+            els.bellContainer.style.display = els.bellEnabled.checked ? 'block' : 'none';
+            els.emailSummaryContainer.style.display = els.emailSummaryEnabled.checked ? 'block' : 'none';
+
+            // Abrir el modal
+            const modal = new bootstrap.Modal(document.getElementById('profileSettingsModal'));
+            modal.show();
+        });
+
+        // Listener de cambio para la campana
+        els.bellEnabled.addEventListener('change', () => {
+            els.bellContainer.style.display = els.bellEnabled.checked ? 'block' : 'none';
+        });
+        
+        // Listener de cambio para el resumen de email
+        els.emailSummaryEnabled.addEventListener('change', () => {
+            els.emailSummaryContainer.style.display = els.emailSummaryEnabled.checked ? 'block' : 'none';
+        });
+
+        // Listener para guardar la configuración
+        els.profileForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const settings = {
+                // Campana
+                bellEnabled: els.bellEnabled.checked,
+                bellValue: parseInt(els.bellValue.value, 10),
+                bellUnit: els.bellUnit.value,
+                
+                // Resumen Email (Recopilación completa de campos)
+                emailSummaryEnabled: els.emailSummaryEnabled.checked,
+                emailSummaryValue: parseInt(els.emailSummaryValue.value, 10),
+                emailSummaryUnit: els.emailSummaryUnit.value
+            };
+
+            // Validación de valores positivos para Email Summary
+            if(settings.emailSummaryEnabled && (isNaN(settings.emailSummaryValue) || settings.emailSummaryValue < 1)) {
+                alert('El valor de Frecuencia del Resumen por Email debe ser un número positivo.');
+                return;
+            }
+            
+            // Validación de valores positivos para la Campana
+            if(settings.bellEnabled && (isNaN(settings.bellValue) || settings.bellValue < 1)) {
+                alert('El valor de Anticipación de la campana debe ser un número positivo.');
+                return;
+            }
+            
+            await saveUserSettings(settings);
+            bootstrap.Modal.getInstance(document.getElementById('profileSettingsModal')).hide();
+        });
+        
+        // ******************************************************
+        // 13. HELPERS UI
+        // ******************************************************
+        const updateUIForAuth = () => { 
+            const isAuth = !!firebaseUser;
+            els.loginBtn.classList.toggle('d-none', isAuth);
+            els.userProfileArea.classList.toggle('d-none-auth', !isAuth);
+            els.notificationsArea.classList.toggle('d-none-auth', !isAuth);
+            els.taskSection.style.display = isAuth ? 'block' : 'none';
+            if(isAuth) document.getElementById('user-display-name').textContent = firebaseUser.displayName || firebaseUser.email.split('@')[0];
+        };
+        
+        els.loginBtn.addEventListener('click', signIn);
+        els.logoutBtn.addEventListener('click', signOut);
+        // Actualiza las notificaciones cada minuto
+        setInterval(updateNotifications, 60000); 
+
+        // Asegura que la UI de autenticación se actualice correctamente al cargar
+        document.addEventListener('DOMContentLoaded', () => {
+            updateUIForAuth();
+        });
+
+    </script>
+</body>
+</html>
