@@ -10,7 +10,7 @@ Aplicación de gestión de tareas con recordatorios por notificación y email. C
 ## 🚀 Instalación
 
 ```bash
-git clone https://github.com/tuusuario/taskspace.git
+git clone https://github.com/tuusuario/taskspace-ok.git
 cd taskspace/web
 npm install
 cd ../functions
