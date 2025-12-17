@@ -1,38 +1,51 @@
-const functions = require("firebase-functions");
+/* eslint-disable comma-dangle */
+/* eslint-disable quotes */
+/* eslint-disable arrow-parens */
+/* eslint-disable no-trailing-spaces */
+/* eslint-disable max-len */
+/* eslint-disable indent */
+/* eslint-disable object-curly-spacing */
+/* eslint-disable eol-last */
 const admin = require("firebase-admin");
-const sgMail = require("@sendgrid/mail");
-const twilio = require("twilio");
+const functions = require("firebase-functions");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const transporter = require("./transporter");
+const { generateTaskEmail } = require("./emailTemplate");
 
 admin.initializeApp();
-const db = admin.firestore();
+// 👇 CAMBIO CLAVE: Realtime Database
+const db = admin.database();
 
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-const twilioClient = twilio(process.env.TWILIO_SID, process.env.TWILIO_TOKEN);
+// Endpoint de prueba (HTTP)
+exports.sendTestEmail = functions.https.onRequest(async (req, res) => {
+    const TEST_USER_UID = "o2Ys6KW9BzWTj20irQ5QmI5JHLm2"; 
+    const TEST_RECIPIENT_EMAIL = process.env.TEST_RECIPIENT_EMAIL;
 
-// Mecanismo simple: colección reminders con sendAt y sent flag
-exports.sendDueReminders = functions.pubsub.schedule("every 1 minutes").onRun(async () => {
-  const now = admin.firestore.Timestamp.now();
-  const snaps = await db.collection("reminders").where("sendAt", "<=", now).where("sent", "==", false).limit(100).get();
-  const batch = db.batch();
-  const promises = [];
+    try {
+        const snapshot = await db.ref(`users/${TEST_USER_UID}/tasks`).once("value");
+        const tasksObj = snapshot.val() || {};
+        
+        // Filtrar pendientes
+        const pendingTasks = Object.values(tasksObj).filter(t => !t.isCompleted);
 
-  snaps.forEach(s => {
-    const r = s.data();
-    const ref = s.ref;
-    if (r.method === "push" && r.pushTokens?.length) {
-      promises.push(admin.messaging().sendToDevice(r.pushTokens, { notification: { title: r.title, body: r.body }, data: { taskId: r.taskId } }));
+        const emailContent = generateTaskEmail(pendingTasks, "Usuario de Prueba");
+
+        await transporter.sendMail({
+            from: '"TaskSpace Alerts" <alerts@taskspacepro.com>',
+            to: TEST_RECIPIENT_EMAIL,
+            subject: emailContent.subject,
+            html: emailContent.html
+        });
+
+        res.send(`✅ Correo enviado con éxito a ${TEST_RECIPIENT_EMAIL}`);
+    } catch (e) {
+        console.error("Error:", e);
+        res.status(500).send("Error: " + e.message);
     }
-    if (r.method === "email" && r.email) {
-      const msg = { to: r.email, from: "no-reply@taskspace.app", subject: r.title, text: r.body };
-      promises.push(sgMail.send(msg));
-    }
-    if (r.method === "whatsapp" && r.phone) {
-      promises.push(twilioClient.messages.create({ from: `whatsapp:${process.env.TWILIO_WHATSAPP_FROM}`, to: `whatsapp:${r.phone}`, body: r.body }));
-    }
-    batch.update(ref, { sent: true, sentAt: admin.firestore.FieldValue.serverTimestamp() });
-  });
+});
 
-  await Promise.all(promises);
-  await batch.commit();
-  return null;
+// Función programada (Cron Job)
+exports.scheduledTaskSummary = onSchedule("0 9 * * *", async (event) => {
+    // Aquí iría la lógica para recorrer todos los usuarios y enviar sus resúmenes
+    functions.logger.info("Ejecutando resumen diario de tareas...");
 });

@@ -1,0 +1,58 @@
+body { 
+    font-family: 'Roboto', sans-serif;
+    background-color: #f0f2f5; 
+}
+
+/* Colores de Prioridad */
+.priority-color-urgente { color: #dc3545 !important; font-weight: bold; }
+.priority-color-alta { color: #fd7e14 !important; font-weight: bold; }
+.priority-color-media { color: #0d6efd !important; font-weight: bold; }
+.priority-color-baja { color: #6c757d !important; font-weight: bold; }
+
+#taskPriority, #taskPriority option { font-weight: bold; }
+
+/* Estilos de Tarjeta */
+.task-card { 
+    transition: all 0.2s ease-in-out;
+    border-radius: 12px; 
+    border: 0; 
+    background: white;
+}
+.task-card:hover { 
+    transform: translateY(-3px);
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.10)!important; 
+}
+
+/* Bordes laterales por prioridad */
+.task-card.border-danger { border-left: 5px solid #dc3545 !important; } 
+.task-card.border-warning { border-left: 5px solid #fd7e14 !important; } 
+.task-card.border-info { border-left: 5px solid #0d6efd !important; } 
+.task-card.border-secondary { border-left: 5px solid #6c757d !important; }
+.task-card.border-success { border-left: 5px solid #198754 !important; }
+
+/* Estilo Tarea Completada */
+.task-card.completed { opacity: 0.8; background-color: #f8f9fa; }
+.task-card.completed .card-title { text-decoration: line-through; color: #6c757d; }
+.task-card.bg-light { background-color: #e2e6ea !important; } 
+
+/* Utilidades */
+.d-none-auth { display: none !important; }
+.cursor-pointer { cursor: pointer; }
+.task-info-small { font-size: 0.75rem; color: #adb5bd; }
+.task-info-small.text-success { color: #198754 !important; }
+
+/* Dropdown de Notificaciones */
+.notification-dropdown-menu {
+    width: 360px;
+    max-height: 450px;
+    overflow-y: auto;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    border: none;
+    z-index: 2000;
+}
+.notification-item { border-bottom: 1px solid #f0f0f0; padding: 12px 20px; transition: background 0.2s; }
+.notification-item:hover { background-color: #f8f9fa; }
+
+/* Barra de Acción Masiva */
+#bulk-action-bar { z-index: 1060; border-top-left-radius: 16px; border-top-right-radius: 16px; }

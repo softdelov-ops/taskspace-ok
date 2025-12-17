@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "@dataconnect/admin-generated": "file:src/dataconnect-admin-generated",
+    "express": "^4.18.2",
+    "firebase-admin": "^11.5.0",
+    "mailtrap": "^3.0.0"
+  },
+  "devDependencies": {
+    "vite": "^7.3.0"
+  }
+}

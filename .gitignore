@@ -1,13 +1,27 @@
 # Node
 node_modules/
-.env
+.env*
 .env.local
 
 # Firebase
 .firebase/
+.firebase*
+.database*
+.firestore*
 functions/node_modules/
 functions/.env
+functions/bd
+firebase-debug.log*
+firebase-admin.log
 
 # Vite
 dist/
 .vite/
+.vite*
+
+# Archivos Secretos
+.env
+*.log
+
+# IDEs
+.vscode/
