@@ -2,385 +2,290 @@
 // 1. CONFIGURACIÓN E INICIALIZACIÓN
 // ******************************************************
 const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
+
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const rtdb = firebase.database();
 
 // ******************************************************
-// 2. VARIABLES GLOBALES Y DOM
+// 2. VARIABLES DE ESTADO Y DOM
 // ******************************************************
 let firebaseUser = null;
 let tasks = [];
-let unsubscribeTasks = null; 
-const PENDING_SORT_KEY = 'taskspace_pending_sort';
-const PENDING_PER_PAGE_KEY = 'taskspace_pending_per_page';
-const COMPLETED_SORT_KEY = 'taskspace_completed_sort';
-const COMPLETED_PER_PAGE_KEY = 'taskspace_completed_per_page';
-
-let pendingSort = localStorage.getItem(PENDING_SORT_KEY) || 'priorityAscDateAsc';
-let completedSort = localStorage.getItem(COMPLETED_SORT_KEY) || 'completedDateDesc';
-let pendingItemsPerPage = parseInt(localStorage.getItem(PENDING_PER_PAGE_KEY)) || 10;
-let completedItemsPerPage = parseInt(localStorage.getItem(COMPLETED_PER_PAGE_KEY)) || 10;
-
-let pendingCurrentPage = 1;
-let completedCurrentPage = 1;
-
-let pendingFilter = { type: 'none', value: '', start: null, end: null };
-let completedFilter = { type: 'none', value: '', start: null, end: null };
-
 let bulkSelection = new Set();
-let userSettings = {};
+let userSettings = { bellEnabled: true, bellValue: 1, bellUnit: 'h', emailSummaryEnabled: false, emailSummaryUnit: 'mo' };
+
+const state = {
+    pending: { page: 1, filter: 'none', sort: localStorage.getItem('pending_sort') || 'date', limit: parseInt(localStorage.getItem('pending_limit')) || 5 },
+    completed: { page: 1, filter: 'none', sort: localStorage.getItem('completed_sort') || 'date', limit: parseInt(localStorage.getItem('completed_limit')) || 5 }
+};
 
 const els = {
     loginBtn: document.getElementById('login-btn'),
     logoutBtn: document.getElementById('logout-btn'),
-    userProfileArea: document.getElementById('user-profile-area'),
     taskSection: document.getElementById('task-section'),
+    userProfileArea: document.getElementById('user-profile-area'),
     notificationsArea: document.getElementById('notifications-area'),
-    notifBell: document.getElementById('notification-bell'),
-    notifList: document.getElementById('notification-list-content'),
     notifCount: document.getElementById('notif-count'),
+    notifList: document.getElementById('notification-list-content'),
+    pendingTasks: document.getElementById('pending-tasks'),
+    completedTasks: document.getElementById('completed-tasks'),
     bulkBar: document.getElementById('bulk-action-bar'),
     taskModal: document.getElementById('taskModal'),
-    newTaskForm: document.getElementById('newTaskForm'),
-    profileForm: document.getElementById('profileSettingsForm'),
-    pendingContainer: document.getElementById('pending-tasks'),
-    completedContainer: document.getElementById('completed-tasks'),
-    pendingPaginationContainer: document.getElementById('pending-pagination-container'), 
-    completedPaginationContainer: document.getElementById('completed-pagination-container'), 
-    bellEnabled: document.getElementById('bellEnabled'),
-    bellValue: document.getElementById('bellValue'),
-    bellUnit: document.getElementById('bellUnit'),
-    bellContainer: document.getElementById('bellConfigContainer'),
-    emailSummaryEnabled: document.getElementById('emailSummaryEnabled'),
-    emailSummaryUnit: document.getElementById('emailSummaryUnit'),
-    emailSummaryContainer: document.getElementById('emailSummaryConfigContainer'),
-    settingsModal: document.getElementById('settingsModal'),
-    settingsContent: document.getElementById('settings-content')
+    taskName: document.getElementById('taskName'),
+    taskForm: document.getElementById('newTaskForm')
 };
 
 // ******************************************************
 // 3. AUTENTICACIÓN
 // ******************************************************
-const signIn = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(console.error);
-const signOut = () => auth.signOut().then(() => { 
-    tasks = []; 
-    if (firebaseUser && unsubscribeTasks) {
-         rtdb.ref(`users/${firebaseUser.uid}/tasks`).off('value');
-    }
-    updateUIForAuth(); 
-    renderTasks(); 
-});
-
 auth.onAuthStateChanged(user => {
     firebaseUser = user;
-    if (user) loadUserSettings().then(fetchTasks);
-    else {
-        updateUIForAuth();
-        renderTasks();
+    if (user) {
+        document.getElementById('user-display-name').textContent = user.displayName;
+        loadUserSettings();
+        listenToTasks();
     }
+    updateUIAuth();
 });
 
-// ******************************************************
-// 4. SETTINGS DE USUARIO (RTDB) 
-// ******************************************************
-const loadUserSettings = async () => {
-    if (!firebaseUser) return;
-    try {
-        await rtdb.ref(`users/${firebaseUser.uid}/profile`).update({
-            email: firebaseUser.email, 
-            displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0]
-        });
-
-        const ref = rtdb.ref(`users/${firebaseUser.uid}/settings/prefs`);
-        const snapshot = await ref.once('value');
-        const data = snapshot.val();
-
-        if (data) {
-            userSettings = data;
-        } else {
-            userSettings = {
-                bellEnabled: true, bellValue: 1, bellUnit: 'h',
-                emailSummaryEnabled: false, 
-                emailSummaryUnit: 'mo' 
-            };
-            await ref.set(userSettings);
-        }
-    } catch (e) { console.error(e); }
-    updateUIForAuth();
-};
-
-const saveUserSettings = async (settings) => {
-    if (!firebaseUser) return;
-    const payload = {
-        bellEnabled: settings.bellEnabled,
-        bellValue: settings.bellValue,
-        bellUnit: settings.bellUnit,
-        emailSummaryEnabled: settings.emailSummaryEnabled,
-        emailSummaryUnit: settings.emailSummaryUnit
-    };
-    await rtdb.ref(`users/${firebaseUser.uid}/settings/prefs`).update(payload);
-    userSettings = { ...userSettings, ...payload };
-    updateNotifications();
-    renderTasks();
-};
-
-// ******************************************************
-// 5. GESTIÓN DE TAREAS (CRUD RTDB)
-// ******************************************************
-const fetchTasks = () => {
-    if (!firebaseUser) return;
-    if (unsubscribeTasks) unsubscribeTasks.off('value'); 
-
-    const ref = rtdb.ref(`users/${firebaseUser.uid}/tasks`);
-    unsubscribeTasks = ref;
-    
-    ref.on('value', (snapshot) => {
-        const tasksObject = snapshot.val();
-        tasks = [];
-        if (tasksObject) {
-            tasks = Object.keys(tasksObject).map(key => {
-                const d = tasksObject[key];
-                return {
-                    id: key,
-                    name: d.name,
-                    dateTime: d.dateTime ? new Date(d.dateTime) : null,
-                    priority: d.priority,
-                    notes: d.notes || '',
-                    isCompleted: d.isCompleted || false,
-                    completedAt: d.completedAt ? new Date(d.completedAt) : null,
-                    createdAt: d.createdAt ? new Date(d.createdAt) : new Date()
-                };
-            });
-        }
-        renderTasks();
-        updateNotifications();
-    });
-};
-
-const saveTask = async (data) => {
-    if (!firebaseUser) return;
-    const payload = {
-        name: data.name,
-        dateTime: data.dateTime ? data.dateTime.getTime() : null,
-        priority: data.priority,
-        notes: data.notes || '',
-        isCompleted: data.isCompleted || false,
-        completedAt: data.completedAt ? data.completedAt.getTime() : null,
-        createdAt: data.createdAt ? data.createdAt.getTime() : firebase.database.ServerValue.TIMESTAMP 
-    };
-
-    const taskRef = rtdb.ref(`users/${firebaseUser.uid}/tasks`);
-    if (data.id) await taskRef.child(data.id).update(payload);
-    else await taskRef.push(payload);
-};
-
-window.toggleComplete = async (id) => {
-    const task = tasks.find(t => t.id === id);
-    if (!task) return;
-    const isCompleted = !task.isCompleted;
-    const payload = { 
-        isCompleted: isCompleted,
-        completedAt: isCompleted ? new Date().getTime() : null
-    };
-    await rtdb.ref(`users/${firebaseUser.uid}/tasks/${id}`).update(payload);
-};
-
-window.deleteTask = async (id) => {
-    if (confirm('¿Estás seguro?')) {
-        await rtdb.ref(`users/${firebaseUser.uid}/tasks/${id}`).remove();
-        bulkSelection.delete(id);
-        updateBulkActionBar(); 
-    }
-};
-
-window.processBulkAction = async (action) => { 
-    if (!firebaseUser || bulkSelection.size === 0) return; 
-    if (confirm(`¿Deseas procesar ${bulkSelection.size} tarea(s)?`)) { 
-        const updates = {};
-        bulkSelection.forEach(id => { 
-            const path = `users/${firebaseUser.uid}/tasks/${id}`; 
-            if (action === 'delete') updates[path] = null;
-            else {
-                updates[`${path}/isCompleted`] = (action === 'complete');
-                updates[`${path}/completedAt`] = (action === 'complete') ? new Date().getTime() : null;
-            }
-        }); 
-        await rtdb.ref().update(updates); 
-        bulkSelection.clear(); 
-        updateBulkActionBar(); 
-    } 
-};
-
-// ******************************************************
-// 6. NOTIFICACIONES
-// ******************************************************
-const getPriorityColor = (priority) => { 
-    switch (priority) { 
-        case 'urgente': return 'danger'; 
-        case 'alta': return 'warning'; 
-        case 'media': return 'info'; 
-        default: return 'secondary'; 
-    } 
-};
-const getPriorityBadge = (priority) => {
-    switch (priority) {
-        case 'urgente': return '<span class="badge bg-danger">🔥 Urgente</span>';
-        case 'alta': return '<span class="badge bg-warning text-dark">⬆️ Alta</span>';
-        case 'media': return '<span class="badge bg-info text-dark">⏺️ Media</span>';
-        default: return '<span class="badge bg-secondary">⬇️ Baja</span>';
-    }
-};
-
-const updateNotifications = () => {
-    if (!firebaseUser || !userSettings.bellEnabled) {
-        els.notifCount.style.display = 'none';
-        els.notifList.innerHTML = `<li class="dropdown-item text-muted small py-3">Alertas desactivadas.</li>`;
-        return;
-    }
-    const now = new Date();
-    const alertTime = calculateAlertTime(now);
-    const alerts = tasks.filter(t => !t.isCompleted && t.dateTime && t.dateTime.getTime() <= alertTime);
-
-    els.notifCount.style.display = alerts.length ? 'block' : 'none';
-    els.notifCount.textContent = alerts.length;
-    els.notifList.innerHTML = alerts.map(t => `
-        <li class="notification-item d-flex align-items-center justify-content-between">
-            <div onclick="openEditModal('${t.id}')" style="cursor:pointer; flex: 1;">
-                <div class="fw-bold text-dark">${t.name}</div>
-                <div class="small text-primary">${t.dateTime.toLocaleString()}</div>
-            </div>
-        </li>
-    `).join('') || '<li class="dropdown-item text-muted small py-3">Sin alertas.</li>';
-};
-
-const calculateAlertTime = (now) => {
-    const { bellValue, bellUnit } = userSettings;
-    const multipliers = { m: 60000, h: 3600000, d: 86400000, w: 604800000, mo: 2592000000 };
-    return now.getTime() + (parseInt(bellValue) * (multipliers[bellUnit] || 0));
-};
-
-// ******************************************************
-// 7. RENDERIZADO Y FILTROS
-// ******************************************************
-const filterTasksAndSort = (taskList, isCompleted) => {
-    const filter = isCompleted ? completedFilter : pendingFilter;
-    const sortKey = isCompleted ? completedSort : pendingSort;
-
-    let list = taskList.filter(t => {
-        if (filter.type === 'name') return t.name.toLowerCase().includes(filter.value.toLowerCase());
-        if (filter.type === 'priority') return t.priority === filter.value;
-        return true;
-    });
-
-    list.sort((a, b) => {
-        if (sortKey === 'nameAsc') return a.name.localeCompare(b.name);
-        if (sortKey === 'dateAsc') return (a.dateTime || 0) - (b.dateTime || 0);
-        return 0;
-    });
-    return list;
-};
-
-const renderTasks = () => {
-    if (!firebaseUser) {
-        els.pendingContainer.innerHTML = '<div class="alert alert-info text-center mt-4">Inicia sesión.</div>';
-        return;
-    }
-    const pTasks = filterTasksAndSort(tasks.filter(t => !t.isCompleted), false);
-    const cTasks = filterTasksAndSort(tasks.filter(t => t.isCompleted), true);
-    
-    document.getElementById('pendingTasksHeader').textContent = `Pendientes (${pTasks.length})`;
-    document.getElementById('completedTasksHeader').textContent = `Completadas (${cTasks.length})`;
-
-    renderList(pTasks, els.pendingContainer, els.pendingPaginationContainer, pendingItemsPerPage, pendingCurrentPage, false);
-    renderList(cTasks, els.completedContainer, els.completedPaginationContainer, completedItemsPerPage, completedCurrentPage, true);
-};
-
-const renderList = (list, container, pagContainer, perPage, page, isCompleted) => {
-    const start = (page - 1) * perPage;
-    const paginated = list.slice(start, start + perPage);
-    container.innerHTML = paginated.map(t => {
-        const border = t.isCompleted ? 'border-success' : `border-${getPriorityColor(t.priority)}`;
-        return `
-            <div class="card task-card mb-3 shadow-sm ${border} ${t.isCompleted ? 'completed' : ''}">
-                <div class="card-body p-3 d-flex align-items-start">
-                    <input type="checkbox" class="form-check-input me-3 mt-1" onchange="toggleBulkCheckbox('${t.id}', this.checked)" ${bulkSelection.has(t.id) ? 'checked' : ''}>
-                    <div class="flex-grow-1" onclick="openEditModal('${t.id}')" style="cursor:pointer">
-                        <h6 class="fw-bold mb-1">${t.name}</h6>
-                        <small class="text-muted">${t.notes || 'Sin notas'}</small>
-                    </div>
-                    <div class="text-end">
-                        ${getPriorityBadge(t.priority)}
-                        <div class="mt-2">
-                            <button class="btn btn-sm btn-outline-success" onclick="toggleComplete('${t.id}')"><i class="bi bi-check"></i></button>
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteTask('${t.id}')"><i class="bi bi-trash"></i></button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('') || '<div class="alert alert-light text-center">Vacio</div>';
-};
-
-// ******************************************************
-// 8. ACCIONES Y EVENTOS
-// ******************************************************
-window.openEditModal = (id) => {
-    const t = tasks.find(x => x.id === id);
-    if (!t) return;
-    document.getElementById('taskID').value = t.id;
-    document.getElementById('taskName').value = t.name;
-    document.getElementById('taskPriority').value = t.priority;
-    document.getElementById('taskNotes').value = t.notes;
-    new bootstrap.Modal(els.taskModal).show();
-};
-
-els.newTaskForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const data = {
-        id: document.getElementById('taskID').value,
-        name: document.getElementById('taskName').value,
-        priority: document.getElementById('taskPriority').value,
-        notes: document.getElementById('taskNotes').value,
-        dateTime: new Date(document.getElementById('taskDateTime').value)
-    };
-    await saveTask(data);
-    bootstrap.Modal.getInstance(els.taskModal).hide();
-});
-
-window.toggleBulkCheckbox = (id, checked) => {
-    if (checked) bulkSelection.add(id); else bulkSelection.delete(id);
-    updateBulkActionBar();
-};
-
-const updateBulkActionBar = () => {
-    els.bulkBar.style.display = bulkSelection.size > 0 ? 'block' : 'none';
-    document.getElementById('selected-count').textContent = `${bulkSelection.size} seleccionadas`;
-    document.getElementById('bulk-complete-btn').disabled = bulkSelection.size === 0;
-};
-
-els.loginBtn.addEventListener('click', signIn);
-els.logoutBtn.addEventListener('click', signOut);
-
-const updateUIForAuth = () => { 
+const updateUIAuth = () => {
     const isAuth = !!firebaseUser;
     els.loginBtn.classList.toggle('d-none', isAuth);
     els.userProfileArea.classList.toggle('d-none-auth', !isAuth);
     els.notificationsArea.classList.toggle('d-none-auth', !isAuth);
     els.taskSection.style.display = isAuth ? 'block' : 'none';
-    if(isAuth) document.getElementById('user-display-name').textContent = firebaseUser.displayName;
 };
 
 // ******************************************************
-// 9. INICIALIZACIÓN
+// 4. LÓGICA DE TAREAS Y FILTROS
 // ******************************************************
-document.addEventListener('DOMContentLoaded', updateUIForAuth);
-setInterval(updateNotifications, 60000);
+function listenToTasks() {
+    rtdb.ref(`users/${firebaseUser.uid}/tasks`).on('value', snap => {
+        const data = snap.val() || {};
+        tasks = Object.keys(data).map(id => ({ 
+            id, ...data[id], 
+            dt: new Date(data[id].dateTime) 
+        }));
+        renderAll();
+        updateAlerts();
+    });
+}
+
+function processList(type, list, container) {
+    let sortedList = [...list];
+    const s = state[type];
+    const activeSort = s.filter !== 'none' ? s.filter : s.sort;
+
+    // Ordenamiento Funcional
+    if (activeSort === 'name') sortedList.sort((a,b) => a.name.localeCompare(b.name));
+    else if (activeSort === 'priority') {
+        const pMap = { urgente: 1, alta: 2, media: 3, baja: 4 };
+        sortedList.sort((a,b) => pMap[a.priority] - pMap[b.priority]);
+    } else {
+        sortedList.sort((a,b) => a.dateTime - b.dateTime);
+    }
+
+    const totalPages = Math.ceil(sortedList.length / s.limit) || 1;
+    if (s.page > totalPages) s.page = totalPages;
+    const paginated = sortedList.slice((s.page - 1) * s.limit, s.page * s.limit);
+
+    container.innerHTML = paginated.map(t => `
+        <div class="card task-card mb-2 border-start border-4 border-${getPriorityColor(t.priority)} ${t.isCompleted ? 'bg-light' : 'bg-white shadow-sm'}">
+            <div class="card-body p-3 d-flex align-items-center">
+                <input type="checkbox" class="form-check-input me-3" onchange="toggleBulk('${t.id}', this.checked)" ${bulkSelection.has(t.id) ? 'checked' : ''}>
+                <div class="flex-grow-1" onclick="openEdit('${t.id}')" style="cursor:pointer">
+                    <div class="${t.isCompleted ? 'text-decoration-line-through text-muted' : 'fw-bold'}">${t.name}</div>
+                    <small class="text-muted"><i class="bi bi-clock"></i> ${t.dt.toLocaleString()}</small>
+                </div>
+                <button class="btn btn-sm text-danger" onclick="deleteTask('${t.id}')"><i class="bi bi-trash"></i></button>
+            </div>
+        </div>
+    `).join('') || '<p class="text-center text-muted py-3">No hay tareas</p>';
+
+    renderPagination(type, sortedList.length, s.limit, s.page);
+}
+
+const renderAll = () => {
+    processList('pending', tasks.filter(t => !t.isCompleted), els.pendingTasks);
+    processList('completed', tasks.filter(t => t.isCompleted), els.completedTasks);
+};
+
+// ******************************************************
+// 5. VALIDACIÓN Y MODAL DE TAREAS
+// ******************************************************
+els.taskForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('taskID').value;
+    const dtValue = document.getElementById('taskDateTime').value;
+    const dt = new Date(dtValue).getTime();
+
+    // VALIDACIÓN: Vencimiento no menor a fecha actual
+    if (dt < Date.now()) {
+        alert("⚠️ La fecha de vencimiento no puede ser anterior a la actual.");
+        return;
+    }
+
+    const data = {
+        name: els.taskName.value,
+        priority: document.getElementById('taskPriority').value,
+        notes: document.getElementById('taskNotes').value,
+        dateTime: dt,
+        isCompleted: false,
+        createdAt: id ? tasks.find(t=>t.id===id).createdAt : Date.now()
+    };
+
+    if (id) await rtdb.ref(`users/${firebaseUser.uid}/tasks/${id}`).update(data);
+    else await rtdb.ref(`users/${firebaseUser.uid}/tasks`).push(data);
+
+    bootstrap.Modal.getInstance(els.taskModal).hide();
+};
+
+window.openEdit = (id) => {
+    const t = tasks.find(x => x.id === id);
+    if (!t) return;
+    document.getElementById('taskID').value = t.id;
+    document.getElementById('taskName').value = t.name;
+    document.getElementById('taskDateTime').value = new Date(t.dateTime).toISOString().slice(0, 16);
+    document.getElementById('taskPriority').value = t.priority;
+    document.getElementById('taskNotes').value = t.notes || '';
+    new bootstrap.Modal(els.taskModal).show();
+};
+
+// ******************************************************
+// 6. CONFIGURACIÓN DE LISTAS (SIN RECARGA)
+// ******************************************************
+window.prepareSettings = (type) => {
+    document.getElementById('settingsListType').value = type;
+    document.getElementById('defaultSort').value = state[type].sort;
+    document.getElementById('itemsPerPage').value = state[type].limit;
+};
+
+document.getElementById('settingsForm').onsubmit = (e) => {
+    e.preventDefault();
+    const type = document.getElementById('settingsListType').value;
+    const newSort = document.getElementById('defaultSort').value;
+    const newLimit = parseInt(document.getElementById('itemsPerPage').value);
+
+    state[type].sort = newSort;
+    state[type].limit = newLimit;
+    state[type].page = 1;
+
+    localStorage.setItem(`${type}_sort`, newSort);
+    localStorage.setItem(`${type}_limit`, newLimit);
+
+    renderAll();
+    bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
+};
+
+// ******************************************************
+// 7. PERFIL Y ALERTAS
+// ******************************************************
+document.getElementById('bellEnabled').onchange = (e) => {
+    document.getElementById('bellConfigContainer').style.display = e.target.checked ? 'block' : 'none';
+};
+
+document.getElementById('emailSummaryEnabled').onchange = (e) => {
+    document.getElementById('emailSummaryConfigContainer').style.display = e.target.checked ? 'block' : 'none';
+};
+
+async function loadUserSettings() {
+    const snap = await rtdb.ref(`users/${firebaseUser.uid}/settings/prefs`).once('value');
+    if (snap.exists()) {
+        userSettings = snap.val();
+        document.getElementById('bellEnabled').checked = userSettings.bellEnabled;
+        document.getElementById('bellValue').value = userSettings.bellValue;
+        document.getElementById('bellUnit').value = userSettings.bellUnit;
+        document.getElementById('emailSummaryEnabled').checked = userSettings.emailSummaryEnabled;
+        document.getElementById('emailSummaryUnit').value = userSettings.emailSummaryUnit || 'mo';
+        
+        // Disparar visibilidad inicial
+        document.getElementById('bellEnabled').dispatchEvent(new Event('change'));
+        document.getElementById('emailSummaryEnabled').dispatchEvent(new Event('change'));
+    }
+}
+
+document.getElementById('profileSettingsForm').onsubmit = async (e) => {
+    e.preventDefault();
+    userSettings = {
+        bellEnabled: document.getElementById('bellEnabled').checked,
+        bellValue: parseInt(document.getElementById('bellValue').value),
+        bellUnit: document.getElementById('bellUnit').value,
+        emailSummaryEnabled: document.getElementById('emailSummaryEnabled').checked,
+        emailSummaryUnit: document.getElementById('emailSummaryUnit').value
+    };
+    await rtdb.ref(`users/${firebaseUser.uid}/settings/prefs`).update(userSettings);
+    updateAlerts();
+    bootstrap.Modal.getInstance(document.getElementById('profileSettingsModal')).hide();
+};
+
+function updateAlerts() {
+    if (!userSettings.bellEnabled) {
+        els.notifCount.style.display = 'none';
+        return;
+    }
+    const mult = { m: 60000, h: 3600000, d: 86400000, w: 604800000, mo: 2592000000 };
+    const threshold = Date.now() + (userSettings.bellValue * mult[userSettings.bellUnit]);
+    const alerts = tasks.filter(t => !t.isCompleted && t.dateTime <= threshold);
+    
+    els.notifCount.textContent = alerts.length;
+    els.notifCount.style.display = alerts.length > 0 ? 'block' : 'none';
+    els.notifList.innerHTML = alerts.map(t => `
+        <li class="dropdown-item small border-bottom p-2" onclick="openEdit('${t.id}')">
+            <span class="text-danger fw-bold">⚠️ Vence: ${t.name}</span><br>
+            <small>${t.dt.toLocaleString()}</small>
+        </li>
+    `).join('') || '<li class="dropdown-item text-muted">Sin alertas</li>';
+}
+
+// ******************************************************
+// 8. ACCIONES MASIVAS Y PAGINACIÓN
+// ******************************************************
+window.toggleBulk = (id, checked) => {
+    if (checked) bulkSelection.add(id); else bulkSelection.delete(id);
+    const hasItems = bulkSelection.size > 0;
+    els.bulkBar.style.display = hasItems ? 'block' : 'none';
+    document.getElementById('selected-count').textContent = `${bulkSelection.size} seleccionadas`;
+};
+
+window.processBulkAction = async (action) => {
+    const updates = {};
+    bulkSelection.forEach(id => {
+        const path = `users/${firebaseUser.uid}/tasks/${id}`;
+        if (action === 'delete') updates[path] = null;
+        else updates[`${path}/isCompleted`] = (action === 'complete');
+    });
+    await rtdb.ref().update(updates);
+    bulkSelection.clear();
+    els.bulkBar.style.display = 'none';
+};
+
+function renderPagination(type, totalItems, limit, currentPage) {
+    const totalPages = Math.ceil(totalItems / limit) || 1;
+    const container = document.getElementById(`${type}-pagination-container`);
+    container.innerHTML = `
+        <button class="btn btn-sm btn-light me-2" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage('${type}', ${currentPage - 1})">Ant.</button>
+        <span class="small align-self-center">Pág ${currentPage}/${totalPages}</span>
+        <button class="btn btn-sm btn-light ms-2" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage('${type}', ${currentPage + 1})">Sig.</button>
+    `;
+}
+
+window.changePage = (type, page) => { state[type].page = page; renderAll(); };
+
+// Eventos de Filtros Directos
+document.getElementById('selectPendientes').onchange = (e) => { state.pending.filter = e.target.value; renderAll(); };
+document.getElementById('selectCompletadas').onchange = (e) => { state.completed.filter = e.target.value; renderAll(); };
+
+const getPriorityColor = (p) => ({ urgente: 'danger', alta: 'warning', media: 'info', baja: 'secondary' }[p]);
+window.deleteTask = (id) => confirm('¿Eliminar?') && rtdb.ref(`users/${firebaseUser.uid}/tasks/${id}`).remove();
+
+els.loginBtn.onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+els.logoutBtn.onclick = () => auth.signOut();
