@@ -14,10 +14,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 
-// --- SELECTOR DE BASE DE DATOS ---
-// Cambia a 'firestore' o 'realtime' según prefieras
-//const DB_TYPE = 'realtime'; 
-const DB_TYPE = 'firestore'; 
+const DB_TYPE = 'realtime'; 
 
 const dbRT = firebase.database();
 const dbFS = firebase.firestore();
@@ -26,7 +23,6 @@ const dbFS = firebase.firestore();
 // 2. CAPA DE REPOSITORIO (ABSTRACCIÓN DE BD)
 // ******************************************************
 const repo = {
-    // Escuchar tareas en tiempo real
     listenTasks: (uid, callback) => {
         if (DB_TYPE === 'realtime') {
             return dbRT.ref(`users/${uid}/tasks`).on('value', snap => {
@@ -48,8 +44,6 @@ const repo = {
                 });
         }
     },
-
-    // Guardar o Actualizar Tarea
     saveTask: async (uid, id, data) => {
         if (DB_TYPE === 'realtime') {
             if (id) return dbRT.ref(`users/${uid}/tasks/${id}`).update(data);
@@ -60,21 +54,21 @@ const repo = {
             return col.add(data);
         }
     },
-
-    // Eliminar Tarea
     deleteTask: async (uid, id) => {
         if (DB_TYPE === 'realtime') return dbRT.ref(`users/${uid}/tasks/${id}`).remove();
         return dbFS.collection('users').doc(uid).collection('tasks').doc(id).delete();
     },
-
-    // Acciones Masivas (Batch)
     bulkUpdate: async (uid, selection, action) => {
+        const timestamp = Date.now();
         if (DB_TYPE === 'realtime') {
             const updates = {};
             selection.forEach(id => {
                 const path = `users/${uid}/tasks/${id}`;
                 if (action === 'delete') updates[path] = null;
-                else updates[`${path}/isCompleted`] = (action === 'complete');
+                else {
+                    updates[`${path}/isCompleted`] = (action === 'complete');
+                    if (action === 'complete') updates[`${path}/completedAt`] = timestamp;
+                }
             });
             return dbRT.ref().update(updates);
         } else {
@@ -83,13 +77,15 @@ const repo = {
             selection.forEach(id => {
                 const ref = col.doc(id);
                 if (action === 'delete') batch.delete(ref);
-                else batch.update(ref, { isCompleted: action === 'complete' });
+                else {
+                    const data = { isCompleted: action === 'complete' };
+                    if (action === 'complete') data.completedAt = timestamp;
+                    batch.update(ref, data);
+                }
             });
             return batch.commit();
         }
     },
-
-    // Ajustes de Usuario
     getSettings: async (uid) => {
         if (DB_TYPE === 'realtime') {
             const snap = await dbRT.ref(`users/${uid}/settings/prefs`).once('value');
@@ -99,7 +95,6 @@ const repo = {
             return doc.exists ? doc.data().settings : null;
         }
     },
-
     saveSettings: async (uid, settings) => {
         if (DB_TYPE === 'realtime') {
             return dbRT.ref(`users/${uid}/settings/prefs`).update(settings);
@@ -118,8 +113,18 @@ let bulkSelection = new Set();
 let userSettings = { bellEnabled: true, bellValue: 1, bellUnit: 'h', emailSummaryEnabled: false, emailSummaryUnit: 'mo' };
 
 const state = {
-    pending: { page: 1, filter: 'none', sort: localStorage.getItem('pending_sort') || 'date', limit: parseInt(localStorage.getItem('pending_limit')) || 5 },
-    completed: { page: 1, filter: 'none', sort: localStorage.getItem('completed_sort') || 'date', limit: parseInt(localStorage.getItem('completed_limit')) || 5 }
+    pending: { 
+        page: 1, 
+        filter: 'none', 
+        sort: localStorage.getItem('pending_sort') || 'priority_date', // Default: Prioridad + Vencimiento
+        limit: parseInt(localStorage.getItem('pending_limit')) || 5 
+    },
+    completed: { 
+        page: 1, 
+        filter: 'none', 
+        sort: localStorage.getItem('completed_sort') || 'completion', // Default: Finalización
+        limit: parseInt(localStorage.getItem('completed_limit')) || 5 
+    }
 };
 
 const els = {
@@ -175,13 +180,25 @@ function processList(type, list, container) {
     const s = state[type];
     const activeSort = s.filter !== 'none' ? s.filter : s.sort;
 
-    if (activeSort === 'name') sortedList.sort((a,b) => a.name.localeCompare(b.name));
-    else if (activeSort === 'priority') {
-        const pMap = { urgente: 1, alta: 2, media: 3, baja: 4 };
-        sortedList.sort((a,b) => pMap[a.priority] - pMap[b.priority]);
-    } else {
-        sortedList.sort((a,b) => a.dateTime - b.dateTime);
-    }
+    sortedList.sort((a, b) => {
+        if (activeSort === 'priority_date') {
+            const pMap = { urgente: 1, alta: 2, media: 3, baja: 4 };
+            if (pMap[a.priority] !== pMap[b.priority]) return pMap[a.priority] - pMap[b.priority];
+            return a.dateTime - b.dateTime;
+        }
+        if (activeSort === 'createdAt') {
+            return (b.createdAt || 0) - (a.createdAt || 0); // Orden por creación
+        }
+        if (activeSort === 'completion') {
+            return (b.completedAt || 0) - (a.completedAt || 0);
+        }
+        if (activeSort === 'name') return a.name.localeCompare(b.name);
+        if (activeSort === 'priority') {
+            const pMap = { urgente: 1, alta: 2, media: 3, baja: 4 };
+            return pMap[a.priority] - pMap[b.priority];
+        }
+        return a.dateTime - b.dateTime;
+    });
 
     const totalPages = Math.ceil(sortedList.length / s.limit) || 1;
     if (s.page > totalPages) s.page = totalPages;
@@ -194,6 +211,7 @@ function processList(type, list, container) {
                 <div class="flex-grow-1" onclick="openEdit('${t.id}')" style="cursor:pointer">
                     <div class="${t.isCompleted ? 'text-decoration-line-through text-muted' : 'fw-bold'}">${t.name}</div>
                     <small class="text-muted"><i class="bi bi-clock"></i> ${t.dt.toLocaleString()}</small>
+                    ${t.completedAt ? `<br><small class="text-success" style="font-size:0.7rem">Terminada: ${new Date(t.completedAt).toLocaleString()}</small>` : ''}
                 </div>
                 <button class="btn btn-sm text-danger" onclick="deleteTask('${t.id}')"><i class="bi bi-trash"></i></button>
             </div>
@@ -228,11 +246,12 @@ els.taskForm.onsubmit = async (e) => {
         notes: document.getElementById('taskNotes').value,
         dateTime: dt,
         isCompleted: false,
-        createdAt: id ? tasks.find(t=>t.id===id).createdAt : Date.now()
+        createdAt: id ? (tasks.find(t=>t.id===id)?.createdAt || Date.now()) : Date.now()
     };
 
     await repo.saveTask(firebaseUser.uid, id, data);
     bootstrap.Modal.getInstance(els.taskModal).hide();
+    els.taskForm.reset();
 };
 
 window.openEdit = (id) => {
@@ -247,11 +266,28 @@ window.openEdit = (id) => {
 };
 
 // ******************************************************
-// 7. CONFIGURACIÓN DE LISTAS
+// 7. CONFIGURACIÓN DE LISTAS (INDEPENDIENTES)
 // ******************************************************
 window.prepareSettings = (type) => {
     document.getElementById('settingsListType').value = type;
-    document.getElementById('defaultSort').value = state[type].sort;
+    const sortSelect = document.getElementById('defaultSort');
+    
+    if (type === 'pending') {
+        sortSelect.innerHTML = `
+            <option value="priority_date">Prioridad > Vencimiento</option>
+            <option value="createdAt">Fecha de Creación</option>
+            <option value="name">Alfabético</option>
+            <option value="date">Vencimiento</option>
+        `;
+    } else {
+        sortSelect.innerHTML = `
+            <option value="completion">Fecha de Finalización</option>
+            <option value="name">Alfabético</option>
+            <option value="priority">Prioridad</option>
+        `;
+    }
+    
+    sortSelect.value = state[type].sort;
     document.getElementById('itemsPerPage').value = state[type].limit;
 };
 
@@ -269,7 +305,7 @@ document.getElementById('settingsForm').onsubmit = (e) => {
     localStorage.setItem(`${type}_limit`, newLimit);
 
     renderAll();
-    bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
+    bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide(); // Salir al aplicar
 };
 
 // ******************************************************
@@ -340,7 +376,6 @@ window.toggleBulk = (id, checked) => {
     els.bulkBar.style.display = hasItems ? 'block' : 'none';
     document.getElementById('selected-count').textContent = `${bulkSelection.size} seleccionadas`;
     
-    // Habilitar/Deshabilitar botones de acción masiva
     document.getElementById('bulk-complete-btn').disabled = !hasItems;
     document.getElementById('bulk-uncomplete-btn').disabled = !hasItems;
     document.getElementById('bulk-delete-btn').disabled = !hasItems;
@@ -372,3 +407,8 @@ window.deleteTask = (id) => confirm('¿Eliminar?') && repo.deleteTask(firebaseUs
 
 els.loginBtn.onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
 els.logoutBtn.onclick = () => auth.signOut();
+
+// Vincular botones de configuración a la función prepareSettings
+document.querySelectorAll('[data-bs-target="#settingsModal"]').forEach(btn => {
+    btn.onclick = () => prepareSettings(btn.getAttribute('data-list-type'));
+});
