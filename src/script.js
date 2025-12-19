@@ -13,10 +13,104 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
-const rtdb = firebase.database();
+
+// --- SELECTOR DE BASE DE DATOS ---
+// Cambia a 'firestore' o 'realtime' según prefieras
+//const DB_TYPE = 'realtime'; 
+const DB_TYPE = 'firestore'; 
+
+const dbRT = firebase.database();
+const dbFS = firebase.firestore();
 
 // ******************************************************
-// 2. VARIABLES DE ESTADO Y DOM
+// 2. CAPA DE REPOSITORIO (ABSTRACCIÓN DE BD)
+// ******************************************************
+const repo = {
+    // Escuchar tareas en tiempo real
+    listenTasks: (uid, callback) => {
+        if (DB_TYPE === 'realtime') {
+            return dbRT.ref(`users/${uid}/tasks`).on('value', snap => {
+                const data = snap.val() || {};
+                const list = Object.keys(data).map(id => ({ 
+                    id, ...data[id], 
+                    dt: new Date(data[id].dateTime) 
+                }));
+                callback(list);
+            });
+        } else {
+            return dbFS.collection('users').doc(uid).collection('tasks')
+                .onSnapshot(snap => {
+                    const list = snap.docs.map(doc => {
+                        const d = doc.data();
+                        return { id: doc.id, ...d, dt: new Date(d.dateTime) };
+                    });
+                    callback(list);
+                });
+        }
+    },
+
+    // Guardar o Actualizar Tarea
+    saveTask: async (uid, id, data) => {
+        if (DB_TYPE === 'realtime') {
+            if (id) return dbRT.ref(`users/${uid}/tasks/${id}`).update(data);
+            return dbRT.ref(`users/${uid}/tasks`).push(data);
+        } else {
+            const col = dbFS.collection('users').doc(uid).collection('tasks');
+            if (id) return col.doc(id).update(data);
+            return col.add(data);
+        }
+    },
+
+    // Eliminar Tarea
+    deleteTask: async (uid, id) => {
+        if (DB_TYPE === 'realtime') return dbRT.ref(`users/${uid}/tasks/${id}`).remove();
+        return dbFS.collection('users').doc(uid).collection('tasks').doc(id).delete();
+    },
+
+    // Acciones Masivas (Batch)
+    bulkUpdate: async (uid, selection, action) => {
+        if (DB_TYPE === 'realtime') {
+            const updates = {};
+            selection.forEach(id => {
+                const path = `users/${uid}/tasks/${id}`;
+                if (action === 'delete') updates[path] = null;
+                else updates[`${path}/isCompleted`] = (action === 'complete');
+            });
+            return dbRT.ref().update(updates);
+        } else {
+            const batch = dbFS.batch();
+            const col = dbFS.collection('users').doc(uid).collection('tasks');
+            selection.forEach(id => {
+                const ref = col.doc(id);
+                if (action === 'delete') batch.delete(ref);
+                else batch.update(ref, { isCompleted: action === 'complete' });
+            });
+            return batch.commit();
+        }
+    },
+
+    // Ajustes de Usuario
+    getSettings: async (uid) => {
+        if (DB_TYPE === 'realtime') {
+            const snap = await dbRT.ref(`users/${uid}/settings/prefs`).once('value');
+            return snap.exists() ? snap.val() : null;
+        } else {
+            const doc = await dbFS.collection('users').doc(uid).get();
+            return doc.exists ? doc.data().settings : null;
+        }
+    },
+
+    saveSettings: async (uid, settings) => {
+        if (DB_TYPE === 'realtime') {
+            return dbRT.ref(`users/${uid}/settings/prefs`).update(settings);
+        } else {
+            return dbFS.collection('users').doc(uid).set({ settings }, { merge: true });
+        }
+    }
+};
+
+// ******************************************************
+// 3. VARIABLES DE ESTADO Y DOM
 // ******************************************************
 let firebaseUser = null;
 let tasks = [];
@@ -45,7 +139,7 @@ const els = {
 };
 
 // ******************************************************
-// 3. AUTENTICACIÓN
+// 4. AUTENTICACIÓN
 // ******************************************************
 auth.onAuthStateChanged(user => {
     firebaseUser = user;
@@ -66,15 +160,11 @@ const updateUIAuth = () => {
 };
 
 // ******************************************************
-// 4. LÓGICA DE TAREAS Y FILTROS
+// 5. LÓGICA DE TAREAS Y FILTROS
 // ******************************************************
 function listenToTasks() {
-    rtdb.ref(`users/${firebaseUser.uid}/tasks`).on('value', snap => {
-        const data = snap.val() || {};
-        tasks = Object.keys(data).map(id => ({ 
-            id, ...data[id], 
-            dt: new Date(data[id].dateTime) 
-        }));
+    repo.listenTasks(firebaseUser.uid, (data) => {
+        tasks = data;
         renderAll();
         updateAlerts();
     });
@@ -85,7 +175,6 @@ function processList(type, list, container) {
     const s = state[type];
     const activeSort = s.filter !== 'none' ? s.filter : s.sort;
 
-    // Ordenamiento Funcional
     if (activeSort === 'name') sortedList.sort((a,b) => a.name.localeCompare(b.name));
     else if (activeSort === 'priority') {
         const pMap = { urgente: 1, alta: 2, media: 3, baja: 4 };
@@ -120,7 +209,7 @@ const renderAll = () => {
 };
 
 // ******************************************************
-// 5. VALIDACIÓN Y MODAL DE TAREAS
+// 6. VALIDACIÓN Y MODAL DE TAREAS
 // ******************************************************
 els.taskForm.onsubmit = async (e) => {
     e.preventDefault();
@@ -128,7 +217,6 @@ els.taskForm.onsubmit = async (e) => {
     const dtValue = document.getElementById('taskDateTime').value;
     const dt = new Date(dtValue).getTime();
 
-    // VALIDACIÓN: Vencimiento no menor a fecha actual
     if (dt < Date.now()) {
         alert("⚠️ La fecha de vencimiento no puede ser anterior a la actual.");
         return;
@@ -143,9 +231,7 @@ els.taskForm.onsubmit = async (e) => {
         createdAt: id ? tasks.find(t=>t.id===id).createdAt : Date.now()
     };
 
-    if (id) await rtdb.ref(`users/${firebaseUser.uid}/tasks/${id}`).update(data);
-    else await rtdb.ref(`users/${firebaseUser.uid}/tasks`).push(data);
-
+    await repo.saveTask(firebaseUser.uid, id, data);
     bootstrap.Modal.getInstance(els.taskModal).hide();
 };
 
@@ -161,7 +247,7 @@ window.openEdit = (id) => {
 };
 
 // ******************************************************
-// 6. CONFIGURACIÓN DE LISTAS (SIN RECARGA)
+// 7. CONFIGURACIÓN DE LISTAS
 // ******************************************************
 window.prepareSettings = (type) => {
     document.getElementById('settingsListType').value = type;
@@ -187,7 +273,7 @@ document.getElementById('settingsForm').onsubmit = (e) => {
 };
 
 // ******************************************************
-// 7. PERFIL Y ALERTAS
+// 8. PERFIL Y ALERTAS
 // ******************************************************
 document.getElementById('bellEnabled').onchange = (e) => {
     document.getElementById('bellConfigContainer').style.display = e.target.checked ? 'block' : 'none';
@@ -198,16 +284,15 @@ document.getElementById('emailSummaryEnabled').onchange = (e) => {
 };
 
 async function loadUserSettings() {
-    const snap = await rtdb.ref(`users/${firebaseUser.uid}/settings/prefs`).once('value');
-    if (snap.exists()) {
-        userSettings = snap.val();
+    const data = await repo.getSettings(firebaseUser.uid);
+    if (data) {
+        userSettings = data;
         document.getElementById('bellEnabled').checked = userSettings.bellEnabled;
         document.getElementById('bellValue').value = userSettings.bellValue;
         document.getElementById('bellUnit').value = userSettings.bellUnit;
         document.getElementById('emailSummaryEnabled').checked = userSettings.emailSummaryEnabled;
         document.getElementById('emailSummaryUnit').value = userSettings.emailSummaryUnit || 'mo';
         
-        // Disparar visibilidad inicial
         document.getElementById('bellEnabled').dispatchEvent(new Event('change'));
         document.getElementById('emailSummaryEnabled').dispatchEvent(new Event('change'));
     }
@@ -222,7 +307,7 @@ document.getElementById('profileSettingsForm').onsubmit = async (e) => {
         emailSummaryEnabled: document.getElementById('emailSummaryEnabled').checked,
         emailSummaryUnit: document.getElementById('emailSummaryUnit').value
     };
-    await rtdb.ref(`users/${firebaseUser.uid}/settings/prefs`).update(userSettings);
+    await repo.saveSettings(firebaseUser.uid, userSettings);
     updateAlerts();
     bootstrap.Modal.getInstance(document.getElementById('profileSettingsModal')).hide();
 };
@@ -247,23 +332,22 @@ function updateAlerts() {
 }
 
 // ******************************************************
-// 8. ACCIONES MASIVAS Y PAGINACIÓN
+// 9. ACCIONES MASIVAS Y PAGINACIÓN
 // ******************************************************
 window.toggleBulk = (id, checked) => {
     if (checked) bulkSelection.add(id); else bulkSelection.delete(id);
     const hasItems = bulkSelection.size > 0;
     els.bulkBar.style.display = hasItems ? 'block' : 'none';
     document.getElementById('selected-count').textContent = `${bulkSelection.size} seleccionadas`;
+    
+    // Habilitar/Deshabilitar botones de acción masiva
+    document.getElementById('bulk-complete-btn').disabled = !hasItems;
+    document.getElementById('bulk-uncomplete-btn').disabled = !hasItems;
+    document.getElementById('bulk-delete-btn').disabled = !hasItems;
 };
 
 window.processBulkAction = async (action) => {
-    const updates = {};
-    bulkSelection.forEach(id => {
-        const path = `users/${firebaseUser.uid}/tasks/${id}`;
-        if (action === 'delete') updates[path] = null;
-        else updates[`${path}/isCompleted`] = (action === 'complete');
-    });
-    await rtdb.ref().update(updates);
+    await repo.bulkUpdate(firebaseUser.uid, bulkSelection, action);
     bulkSelection.clear();
     els.bulkBar.style.display = 'none';
 };
@@ -280,12 +364,11 @@ function renderPagination(type, totalItems, limit, currentPage) {
 
 window.changePage = (type, page) => { state[type].page = page; renderAll(); };
 
-// Eventos de Filtros Directos
 document.getElementById('selectPendientes').onchange = (e) => { state.pending.filter = e.target.value; renderAll(); };
 document.getElementById('selectCompletadas').onchange = (e) => { state.completed.filter = e.target.value; renderAll(); };
 
 const getPriorityColor = (p) => ({ urgente: 'danger', alta: 'warning', media: 'info', baja: 'secondary' }[p]);
-window.deleteTask = (id) => confirm('¿Eliminar?') && rtdb.ref(`users/${firebaseUser.uid}/tasks/${id}`).remove();
+window.deleteTask = (id) => confirm('¿Eliminar?') && repo.deleteTask(firebaseUser.uid, id);
 
 els.loginBtn.onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
 els.logoutBtn.onclick = () => auth.signOut();
