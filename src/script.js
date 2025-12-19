@@ -15,12 +15,11 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 
 const DB_TYPE = 'realtime'; 
-
 const dbRT = firebase.database();
 const dbFS = firebase.firestore();
 
 // ******************************************************
-// 2. CAPA DE REPOSITORIO (ABSTRACCIÓN DE BD)
+// 2. CAPA DE REPOSITORIO
 // ******************************************************
 const repo = {
     listenTasks: (uid, callback) => {
@@ -60,9 +59,10 @@ const repo = {
     },
     bulkUpdate: async (uid, selection, action) => {
         const timestamp = Date.now();
+        const selectionArr = Array.from(selection);
         if (DB_TYPE === 'realtime') {
             const updates = {};
-            selection.forEach(id => {
+            selectionArr.forEach(id => {
                 const path = `users/${uid}/tasks/${id}`;
                 if (action === 'delete') updates[path] = null;
                 else {
@@ -74,7 +74,7 @@ const repo = {
         } else {
             const batch = dbFS.batch();
             const col = dbFS.collection('users').doc(uid).collection('tasks');
-            selection.forEach(id => {
+            selectionArr.forEach(id => {
                 const ref = col.doc(id);
                 if (action === 'delete') batch.delete(ref);
                 else {
@@ -115,14 +115,20 @@ let userSettings = { bellEnabled: true, bellValue: 1, bellUnit: 'h', emailSummar
 const state = {
     pending: { 
         page: 1, 
-        filter: 'none', 
-        sort: localStorage.getItem('pending_sort') || 'priority_date', // Default: Prioridad + Vencimiento
+        filterType: 'none', 
+        filterValue: '',
+        dateStart: '',
+        dateEnd: '',
+        sort: localStorage.getItem('pending_sort') || 'priority_date',
         limit: parseInt(localStorage.getItem('pending_limit')) || 5 
     },
     completed: { 
         page: 1, 
-        filter: 'none', 
-        sort: localStorage.getItem('completed_sort') || 'completion', // Default: Finalización
+        filterType: 'none', 
+        filterValue: '',
+        dateStart: '',
+        dateEnd: '',
+        sort: localStorage.getItem('completed_sort') || 'completion',
         limit: parseInt(localStorage.getItem('completed_limit')) || 5 
     }
 };
@@ -140,7 +146,9 @@ const els = {
     bulkBar: document.getElementById('bulk-action-bar'),
     taskModal: document.getElementById('taskModal'),
     taskName: document.getElementById('taskName'),
-    taskForm: document.getElementById('newTaskForm')
+    taskForm: document.getElementById('newTaskForm'),
+    pendingHeader: document.getElementById('pendingTasksHeader'),
+    completedHeader: document.getElementById('completedTasksHeader')
 };
 
 // ******************************************************
@@ -176,33 +184,49 @@ function listenToTasks() {
 }
 
 function processList(type, list, container) {
-    let sortedList = [...list];
+    let processedList = [...list];
     const s = state[type];
-    const activeSort = s.filter !== 'none' ? s.filter : s.sort;
 
-    sortedList.sort((a, b) => {
-        if (activeSort === 'priority_date') {
+    // --- APLICAR FILTROS ---
+    if (s.filterType === 'name' && s.filterValue) {
+        processedList = processedList.filter(t => t.name.toLowerCase().includes(s.filterValue.toLowerCase()));
+    } else if (s.filterType === 'priority' && s.filterValue) {
+        processedList = processedList.filter(t => t.priority === s.filterValue);
+    } else if (s.filterType === 'dateRange' && s.dateStart && s.dateEnd) {
+        const start = new Date(s.dateStart).getTime();
+        const end = new Date(s.dateEnd).getTime();
+        // Pendientes filtran por vencimiento, Completadas por fecha de finalización
+        processedList = processedList.filter(t => {
+            const targetTime = (type === 'pending') ? t.dateTime : t.completedAt;
+            return targetTime >= start && targetTime <= end;
+        });
+    }
+
+    // --- APLICAR ORDENAMIENTO ---
+    processedList.sort((a, b) => {
+        if (s.sort === 'priority_date') {
             const pMap = { urgente: 1, alta: 2, media: 3, baja: 4 };
             if (pMap[a.priority] !== pMap[b.priority]) return pMap[a.priority] - pMap[b.priority];
             return a.dateTime - b.dateTime;
         }
-        if (activeSort === 'createdAt') {
-            return (b.createdAt || 0) - (a.createdAt || 0); // Orden por creación
-        }
-        if (activeSort === 'completion') {
-            return (b.completedAt || 0) - (a.completedAt || 0);
-        }
-        if (activeSort === 'name') return a.name.localeCompare(b.name);
-        if (activeSort === 'priority') {
+        if (s.sort === 'createdAt') return (b.createdAt || 0) - (a.createdAt || 0);
+        if (s.sort === 'completion') return (b.completedAt || 0) - (a.completedAt || 0);
+        if (s.sort === 'name') return a.name.localeCompare(b.name);
+        if (s.sort === 'priority') {
             const pMap = { urgente: 1, alta: 2, media: 3, baja: 4 };
             return pMap[a.priority] - pMap[b.priority];
         }
         return a.dateTime - b.dateTime;
     });
 
-    const totalPages = Math.ceil(sortedList.length / s.limit) || 1;
+    // Actualizar Headers con conteo filtrado
+    if(type === 'pending') els.pendingHeader.textContent = `Pendientes (${processedList.length})`;
+    else els.completedHeader.textContent = `Completadas (${processedList.length})`;
+
+    // --- PAGINACIÓN ---
+    const totalPages = Math.ceil(processedList.length / s.limit) || 1;
     if (s.page > totalPages) s.page = totalPages;
-    const paginated = sortedList.slice((s.page - 1) * s.limit, s.page * s.limit);
+    const paginated = processedList.slice((s.page - 1) * s.limit, s.page * s.limit);
 
     container.innerHTML = paginated.map(t => `
         <div class="card task-card mb-2 border-start border-4 border-${getPriorityColor(t.priority)} ${t.isCompleted ? 'bg-light' : 'bg-white shadow-sm'}">
@@ -216,9 +240,9 @@ function processList(type, list, container) {
                 <button class="btn btn-sm text-danger" onclick="deleteTask('${t.id}')"><i class="bi bi-trash"></i></button>
             </div>
         </div>
-    `).join('') || '<p class="text-center text-muted py-3">No hay tareas</p>';
+    `).join('') || '<p class="text-center text-muted py-3">No hay tareas que coincidan</p>';
 
-    renderPagination(type, sortedList.length, s.limit, s.page);
+    renderPagination(type, processedList.length, s.limit, s.page);
 }
 
 const renderAll = () => {
@@ -226,8 +250,54 @@ const renderAll = () => {
     processList('completed', tasks.filter(t => t.isCompleted), els.completedTasks);
 };
 
+// --- MANEJO DINÁMICO DE INPUTS DE FILTRO ---
+function handleFilterChange(type, filterType) {
+    const s = state[type];
+    s.filterType = filterType;
+    s.page = 1;
+    const container = document.getElementById(`filterInputContainer${type === 'pending' ? 'Pending' : 'Completed'}`);
+    
+    container.innerHTML = ''; // Limpiar
+
+    if (filterType === 'name') {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'form-control form-control-sm';
+        input.placeholder = 'Buscar nombre...';
+        input.oninput = (e) => { s.filterValue = e.target.value; renderAll(); };
+        container.appendChild(input);
+    } else if (filterType === 'priority') {
+        const select = document.createElement('select');
+        select.className = 'form-select form-select-sm';
+        select.innerHTML = `
+            <option value="">Todas</option>
+            <option value="urgente">Urgente</option>
+            <option value="alta">Alta</option>
+            <option value="media">Media</option>
+            <option value="baja">Baja</option>
+        `;
+        select.onchange = (e) => { s.filterValue = e.target.value; renderAll(); };
+        container.appendChild(select);
+    } else if (filterType === 'dateRange') {
+        container.innerHTML = `
+            <input type="date" class="form-control form-control-sm" id="start-${type}">
+            <input type="date" class="form-control form-control-sm" id="end-${type}">
+        `;
+        const dStart = document.getElementById(`start-${type}`);
+        const dEnd = document.getElementById(`end-${type}`);
+        const updateDates = () => {
+            s.dateStart = dStart.value;
+            s.dateEnd = dEnd.value;
+            if(s.dateStart && s.dateEnd) renderAll();
+        };
+        dStart.onchange = updateDates;
+        dEnd.onchange = updateDates;
+    }
+    renderAll();
+}
+
 // ******************************************************
-// 6. VALIDACIÓN Y MODAL DE TAREAS
+// 6. MODAL DE TAREAS
 // ******************************************************
 els.taskForm.onsubmit = async (e) => {
     e.preventDefault();
@@ -235,7 +305,7 @@ els.taskForm.onsubmit = async (e) => {
     const dtValue = document.getElementById('taskDateTime').value;
     const dt = new Date(dtValue).getTime();
 
-    if (dt < Date.now()) {
+    if (dt < Date.now() && !id) {
         alert("⚠️ La fecha de vencimiento no puede ser anterior a la actual.");
         return;
     }
@@ -266,7 +336,7 @@ window.openEdit = (id) => {
 };
 
 // ******************************************************
-// 7. CONFIGURACIÓN DE LISTAS (INDEPENDIENTES)
+// 7. CONFIGURACIÓN DE LISTAS
 // ******************************************************
 window.prepareSettings = (type) => {
     document.getElementById('settingsListType').value = type;
@@ -305,7 +375,7 @@ document.getElementById('settingsForm').onsubmit = (e) => {
     localStorage.setItem(`${type}_limit`, newLimit);
 
     renderAll();
-    bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide(); // Salir al aplicar
+    bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
 };
 
 // ******************************************************
@@ -349,7 +419,7 @@ document.getElementById('profileSettingsForm').onsubmit = async (e) => {
 };
 
 function updateAlerts() {
-    if (!userSettings.bellEnabled) {
+    if (!userSettings.bellEnabled || !tasks.length) {
         els.notifCount.style.display = 'none';
         return;
     }
@@ -399,8 +469,9 @@ function renderPagination(type, totalItems, limit, currentPage) {
 
 window.changePage = (type, page) => { state[type].page = page; renderAll(); };
 
-document.getElementById('selectPendientes').onchange = (e) => { state.pending.filter = e.target.value; renderAll(); };
-document.getElementById('selectCompletadas').onchange = (e) => { state.completed.filter = e.target.value; renderAll(); };
+// Eventos de Filtro
+document.getElementById('selectPendientes').onchange = (e) => handleFilterChange('pending', e.target.value);
+document.getElementById('selectCompletadas').onchange = (e) => handleFilterChange('completed', e.target.value);
 
 const getPriorityColor = (p) => ({ urgente: 'danger', alta: 'warning', media: 'info', baja: 'secondary' }[p]);
 window.deleteTask = (id) => confirm('¿Eliminar?') && repo.deleteTask(firebaseUser.uid, id);
@@ -408,7 +479,6 @@ window.deleteTask = (id) => confirm('¿Eliminar?') && repo.deleteTask(firebaseUs
 els.loginBtn.onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
 els.logoutBtn.onclick = () => auth.signOut();
 
-// Vincular botones de configuración a la función prepareSettings
 document.querySelectorAll('[data-bs-target="#settingsModal"]').forEach(btn => {
     btn.onclick = () => prepareSettings(btn.getAttribute('data-list-type'));
 });
