@@ -13,8 +13,10 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+//ELEGIR TIPO DE BD
+//const DB_TYPE = 'realtime'; 
+const DB_TYPE = 'firestore'; 
 
-const DB_TYPE = 'realtime'; 
 const dbRT = firebase.database();
 const dbFS = firebase.firestore();
 
@@ -187,7 +189,6 @@ function processList(type, list, container) {
     let processedList = [...list];
     const s = state[type];
 
-    // --- APLICAR FILTROS ---
     if (s.filterType === 'name' && s.filterValue) {
         processedList = processedList.filter(t => t.name.toLowerCase().includes(s.filterValue.toLowerCase()));
     } else if (s.filterType === 'priority' && s.filterValue) {
@@ -195,14 +196,12 @@ function processList(type, list, container) {
     } else if (s.filterType === 'dateRange' && s.dateStart && s.dateEnd) {
         const start = new Date(s.dateStart).getTime();
         const end = new Date(s.dateEnd).getTime();
-        // Pendientes filtran por vencimiento, Completadas por fecha de finalización
         processedList = processedList.filter(t => {
             const targetTime = (type === 'pending') ? t.dateTime : t.completedAt;
             return targetTime >= start && targetTime <= end;
         });
     }
 
-    // --- APLICAR ORDENAMIENTO ---
     processedList.sort((a, b) => {
         if (s.sort === 'priority_date') {
             const pMap = { urgente: 1, alta: 2, media: 3, baja: 4 };
@@ -219,11 +218,9 @@ function processList(type, list, container) {
         return a.dateTime - b.dateTime;
     });
 
-    // Actualizar Headers con conteo filtrado
     if(type === 'pending') els.pendingHeader.textContent = `Pendientes (${processedList.length})`;
     else els.completedHeader.textContent = `Completadas (${processedList.length})`;
 
-    // --- PAGINACIÓN ---
     const totalPages = Math.ceil(processedList.length / s.limit) || 1;
     if (s.page > totalPages) s.page = totalPages;
     const paginated = processedList.slice((s.page - 1) * s.limit, s.page * s.limit);
@@ -237,7 +234,14 @@ function processList(type, list, container) {
                     <small class="text-muted"><i class="bi bi-clock"></i> ${t.dt.toLocaleString()}</small>
                     ${t.completedAt ? `<br><small class="text-success" style="font-size:0.7rem">Terminada: ${new Date(t.completedAt).toLocaleString()}</small>` : ''}
                 </div>
-                <button class="btn btn-sm text-danger" onclick="deleteTask('${t.id}')"><i class="bi bi-trash"></i></button>
+                <div class="d-flex gap-1">
+                    ${!t.isCompleted ? `
+                        <button class="btn btn-sm btn-outline-success border-0" onclick="quickAction('${t.id}', 'complete')" title="Completar">
+                            <i class="bi bi-check-circle"></i>
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-sm text-danger border-0" onclick="deleteTask('${t.id}')"><i class="bi bi-trash"></i></button>
+                </div>
             </div>
         </div>
     `).join('') || '<p class="text-center text-muted py-3">No hay tareas que coincidan</p>';
@@ -250,14 +254,12 @@ const renderAll = () => {
     processList('completed', tasks.filter(t => t.isCompleted), els.completedTasks);
 };
 
-// --- MANEJO DINÁMICO DE INPUTS DE FILTRO ---
 function handleFilterChange(type, filterType) {
     const s = state[type];
     s.filterType = filterType;
     s.page = 1;
     const container = document.getElementById(`filterInputContainer${type === 'pending' ? 'Pending' : 'Completed'}`);
-    
-    container.innerHTML = ''; // Limpiar
+    container.innerHTML = ''; 
 
     if (filterType === 'name') {
         const input = document.createElement('input');
@@ -269,43 +271,40 @@ function handleFilterChange(type, filterType) {
     } else if (filterType === 'priority') {
         const select = document.createElement('select');
         select.className = 'form-select form-select-sm';
-        select.innerHTML = `
-            <option value="">Todas</option>
-            <option value="urgente">Urgente</option>
-            <option value="alta">Alta</option>
-            <option value="media">Media</option>
-            <option value="baja">Baja</option>
-        `;
+        select.innerHTML = `<option value="">Todas</option><option value="urgente">Urgente</option><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option>`;
         select.onchange = (e) => { s.filterValue = e.target.value; renderAll(); };
         container.appendChild(select);
     } else if (filterType === 'dateRange') {
-        container.innerHTML = `
-            <input type="date" class="form-control form-control-sm" id="start-${type}">
-            <input type="date" class="form-control form-control-sm" id="end-${type}">
-        `;
+        container.innerHTML = `<input type="date" class="form-control form-control-sm" id="start-${type}"><input type="date" class="form-control form-control-sm" id="end-${type}">`;
         const dStart = document.getElementById(`start-${type}`);
         const dEnd = document.getElementById(`end-${type}`);
-        const updateDates = () => {
-            s.dateStart = dStart.value;
-            s.dateEnd = dEnd.value;
-            if(s.dateStart && s.dateEnd) renderAll();
-        };
-        dStart.onchange = updateDates;
-        dEnd.onchange = updateDates;
+        const updateDates = () => { s.dateStart = dStart.value; s.dateEnd = dEnd.value; if(s.dateStart && s.dateEnd) renderAll(); };
+        dStart.onchange = updateDates; dEnd.onchange = updateDates;
     }
     renderAll();
 }
 
 // ******************************************************
-// 6. MODAL DE TAREAS
+// 6. MODAL DE TAREAS (FOCO Y VALIDACIÓN)
 // ******************************************************
+els.taskModal.addEventListener('shown.bs.modal', () => {
+    els.taskName.focus();
+});
+
+document.getElementById('add-task-btn').onclick = () => {
+    els.taskForm.reset();
+    document.getElementById('taskID').value = '';
+    const now = new Date().toISOString().slice(0, 16);
+    document.getElementById('taskDateTime').min = now;
+};
+
 els.taskForm.onsubmit = async (e) => {
     e.preventDefault();
     const id = document.getElementById('taskID').value;
     const dtValue = document.getElementById('taskDateTime').value;
     const dt = new Date(dtValue).getTime();
 
-    if (dt < Date.now() && !id) {
+    if (dt < (Date.now() - 60000) && !id) {
         alert("⚠️ La fecha de vencimiento no puede ser anterior a la actual.");
         return;
     }
@@ -332,31 +331,61 @@ window.openEdit = (id) => {
     document.getElementById('taskDateTime').value = new Date(t.dateTime).toISOString().slice(0, 16);
     document.getElementById('taskPriority').value = t.priority;
     document.getElementById('taskNotes').value = t.notes || '';
+    // Al editar permitimos ver la fecha actual pero no poner una menor si se cambia
+    document.getElementById('taskDateTime').min = ""; 
     new bootstrap.Modal(els.taskModal).show();
 };
 
 // ******************************************************
-// 7. CONFIGURACIÓN DE LISTAS
+// 7. ALERTAS Y ACCIONES DIRECTAS
+// ******************************************************
+function updateAlerts() {
+    if (!userSettings.bellEnabled || !tasks.length) {
+        els.notifCount.style.display = 'none';
+        return;
+    }
+    const mult = { m: 60000, h: 3600000, d: 86400000, w: 604800000, mo: 2592000000 };
+    const threshold = Date.now() + (userSettings.bellValue * mult[userSettings.bellUnit]);
+    const alerts = tasks.filter(t => !t.isCompleted && t.dateTime <= threshold);
+    
+    els.notifCount.textContent = alerts.length;
+    els.notifCount.style.display = alerts.length > 0 ? 'block' : 'none';
+    
+    els.notifList.innerHTML = alerts.map(t => `
+        <li class="dropdown-item border-bottom p-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div onclick="openEdit('${t.id}')" style="cursor:pointer" class="flex-grow-1">
+                    <span class="text-danger fw-bold small">⚠️ ${t.name}</span><br>
+                    <small class="text-muted">${t.dt.toLocaleString()}</small>
+                </div>
+                <div class="d-flex gap-1 ms-2">
+                    <button class="btn btn-sm btn-success py-0 px-2" onclick="quickAction('${t.id}', 'complete')" title="Completar">
+                        <i class="bi bi-check"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger py-0 px-2" onclick="deleteTask('${t.id}')" title="Eliminar">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </li>
+    `).join('') || '<li class="dropdown-item text-muted text-center py-2">Sin alertas</li>';
+}
+
+window.quickAction = async (id, action) => {
+    await repo.bulkUpdate(firebaseUser.uid, [id], action);
+};
+
+// ******************************************************
+// 8. RESTO DE CONFIGURACIÓN Y EVENTOS
 // ******************************************************
 window.prepareSettings = (type) => {
     document.getElementById('settingsListType').value = type;
     const sortSelect = document.getElementById('defaultSort');
-    
     if (type === 'pending') {
-        sortSelect.innerHTML = `
-            <option value="priority_date">Prioridad > Vencimiento</option>
-            <option value="createdAt">Fecha de Creación</option>
-            <option value="name">Alfabético</option>
-            <option value="date">Vencimiento</option>
-        `;
+        sortSelect.innerHTML = `<option value="priority_date">Prioridad > Vencimiento</option><option value="createdAt">Fecha de Creación</option><option value="name">Alfabético</option><option value="date">Vencimiento</option>`;
     } else {
-        sortSelect.innerHTML = `
-            <option value="completion">Fecha de Finalización</option>
-            <option value="name">Alfabético</option>
-            <option value="priority">Prioridad</option>
-        `;
+        sortSelect.innerHTML = `<option value="completion">Fecha de Finalización</option><option value="name">Alfabético</option><option value="priority">Prioridad</option>`;
     }
-    
     sortSelect.value = state[type].sort;
     document.getElementById('itemsPerPage').value = state[type].limit;
 };
@@ -364,30 +393,17 @@ window.prepareSettings = (type) => {
 document.getElementById('settingsForm').onsubmit = (e) => {
     e.preventDefault();
     const type = document.getElementById('settingsListType').value;
-    const newSort = document.getElementById('defaultSort').value;
-    const newLimit = parseInt(document.getElementById('itemsPerPage').value);
-
-    state[type].sort = newSort;
-    state[type].limit = newLimit;
+    state[type].sort = document.getElementById('defaultSort').value;
+    state[type].limit = parseInt(document.getElementById('itemsPerPage').value);
     state[type].page = 1;
-
-    localStorage.setItem(`${type}_sort`, newSort);
-    localStorage.setItem(`${type}_limit`, newLimit);
-
+    localStorage.setItem(`${type}_sort`, state[type].sort);
+    localStorage.setItem(`${type}_limit`, state[type].limit);
     renderAll();
     bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
 };
 
-// ******************************************************
-// 8. PERFIL Y ALERTAS
-// ******************************************************
-document.getElementById('bellEnabled').onchange = (e) => {
-    document.getElementById('bellConfigContainer').style.display = e.target.checked ? 'block' : 'none';
-};
-
-document.getElementById('emailSummaryEnabled').onchange = (e) => {
-    document.getElementById('emailSummaryConfigContainer').style.display = e.target.checked ? 'block' : 'none';
-};
+document.getElementById('bellEnabled').onchange = (e) => document.getElementById('bellConfigContainer').style.display = e.target.checked ? 'block' : 'none';
+document.getElementById('emailSummaryEnabled').onchange = (e) => document.getElementById('emailSummaryConfigContainer').style.display = e.target.checked ? 'block' : 'none';
 
 async function loadUserSettings() {
     const data = await repo.getSettings(firebaseUser.uid);
@@ -398,7 +414,6 @@ async function loadUserSettings() {
         document.getElementById('bellUnit').value = userSettings.bellUnit;
         document.getElementById('emailSummaryEnabled').checked = userSettings.emailSummaryEnabled;
         document.getElementById('emailSummaryUnit').value = userSettings.emailSummaryUnit || 'mo';
-        
         document.getElementById('bellEnabled').dispatchEvent(new Event('change'));
         document.getElementById('emailSummaryEnabled').dispatchEvent(new Event('change'));
     }
@@ -418,37 +433,12 @@ document.getElementById('profileSettingsForm').onsubmit = async (e) => {
     bootstrap.Modal.getInstance(document.getElementById('profileSettingsModal')).hide();
 };
 
-function updateAlerts() {
-    if (!userSettings.bellEnabled || !tasks.length) {
-        els.notifCount.style.display = 'none';
-        return;
-    }
-    const mult = { m: 60000, h: 3600000, d: 86400000, w: 604800000, mo: 2592000000 };
-    const threshold = Date.now() + (userSettings.bellValue * mult[userSettings.bellUnit]);
-    const alerts = tasks.filter(t => !t.isCompleted && t.dateTime <= threshold);
-    
-    els.notifCount.textContent = alerts.length;
-    els.notifCount.style.display = alerts.length > 0 ? 'block' : 'none';
-    els.notifList.innerHTML = alerts.map(t => `
-        <li class="dropdown-item small border-bottom p-2" onclick="openEdit('${t.id}')">
-            <span class="text-danger fw-bold">⚠️ Vence: ${t.name}</span><br>
-            <small>${t.dt.toLocaleString()}</small>
-        </li>
-    `).join('') || '<li class="dropdown-item text-muted">Sin alertas</li>';
-}
-
-// ******************************************************
-// 9. ACCIONES MASIVAS Y PAGINACIÓN
-// ******************************************************
 window.toggleBulk = (id, checked) => {
     if (checked) bulkSelection.add(id); else bulkSelection.delete(id);
     const hasItems = bulkSelection.size > 0;
     els.bulkBar.style.display = hasItems ? 'block' : 'none';
     document.getElementById('selected-count').textContent = `${bulkSelection.size} seleccionadas`;
-    
-    document.getElementById('bulk-complete-btn').disabled = !hasItems;
-    document.getElementById('bulk-uncomplete-btn').disabled = !hasItems;
-    document.getElementById('bulk-delete-btn').disabled = !hasItems;
+    document.querySelectorAll('#bulk-action-bar button').forEach(b => b.disabled = !hasItems);
 };
 
 window.processBulkAction = async (action) => {
@@ -460,25 +450,15 @@ window.processBulkAction = async (action) => {
 function renderPagination(type, totalItems, limit, currentPage) {
     const totalPages = Math.ceil(totalItems / limit) || 1;
     const container = document.getElementById(`${type}-pagination-container`);
-    container.innerHTML = `
-        <button class="btn btn-sm btn-light me-2" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage('${type}', ${currentPage - 1})">Ant.</button>
-        <span class="small align-self-center">Pág ${currentPage}/${totalPages}</span>
-        <button class="btn btn-sm btn-light ms-2" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage('${type}', ${currentPage + 1})">Sig.</button>
-    `;
+    container.innerHTML = `<button class="btn btn-sm btn-light me-2" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage('${type}', ${currentPage - 1})">Ant.</button><span class="small align-self-center">Pág ${currentPage}/${totalPages}</span><button class="btn btn-sm btn-light ms-2" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage('${type}', ${currentPage + 1})">Sig.</button>`;
 }
 
 window.changePage = (type, page) => { state[type].page = page; renderAll(); };
-
-// Eventos de Filtro
 document.getElementById('selectPendientes').onchange = (e) => handleFilterChange('pending', e.target.value);
 document.getElementById('selectCompletadas').onchange = (e) => handleFilterChange('completed', e.target.value);
-
 const getPriorityColor = (p) => ({ urgente: 'danger', alta: 'warning', media: 'info', baja: 'secondary' }[p]);
 window.deleteTask = (id) => confirm('¿Eliminar?') && repo.deleteTask(firebaseUser.uid, id);
 
 els.loginBtn.onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
 els.logoutBtn.onclick = () => auth.signOut();
-
-document.querySelectorAll('[data-bs-target="#settingsModal"]').forEach(btn => {
-    btn.onclick = () => prepareSettings(btn.getAttribute('data-list-type'));
-});
+document.querySelectorAll('[data-bs-target="#settingsModal"]').forEach(btn => btn.onclick = () => prepareSettings(btn.getAttribute('data-list-type')));
