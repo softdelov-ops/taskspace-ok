@@ -13,10 +13,8 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
-//ELEGIR TIPO DE BD
-//const DB_TYPE = 'realtime'; 
-const DB_TYPE = 'firestore'; 
 
+const DB_TYPE = 'realtime'; 
 const dbRT = firebase.database();
 const dbFS = firebase.firestore();
 
@@ -70,6 +68,7 @@ const repo = {
                 else {
                     updates[`${path}/isCompleted`] = (action === 'complete');
                     if (action === 'complete') updates[`${path}/completedAt`] = timestamp;
+                    else updates[`${path}/completedAt`] = null;
                 }
             });
             return dbRT.ref().update(updates);
@@ -81,7 +80,7 @@ const repo = {
                 if (action === 'delete') batch.delete(ref);
                 else {
                     const data = { isCompleted: action === 'complete' };
-                    if (action === 'complete') data.completedAt = timestamp;
+                    data.completedAt = action === 'complete' ? timestamp : null;
                     batch.update(ref, data);
                 }
             });
@@ -111,28 +110,16 @@ const repo = {
 // ******************************************************
 let firebaseUser = null;
 let tasks = [];
-let bulkSelection = new Set();
+// Selección independiente por tipo de lista
+let bulkSelection = { 
+    type: null, // 'pending' o 'completed'
+    ids: new Set() 
+};
 let userSettings = { bellEnabled: true, bellValue: 1, bellUnit: 'h', emailSummaryEnabled: false, emailSummaryUnit: 'mo' };
 
 const state = {
-    pending: { 
-        page: 1, 
-        filterType: 'none', 
-        filterValue: '',
-        dateStart: '',
-        dateEnd: '',
-        sort: localStorage.getItem('pending_sort') || 'priority_date',
-        limit: parseInt(localStorage.getItem('pending_limit')) || 5 
-    },
-    completed: { 
-        page: 1, 
-        filterType: 'none', 
-        filterValue: '',
-        dateStart: '',
-        dateEnd: '',
-        sort: localStorage.getItem('completed_sort') || 'completion',
-        limit: parseInt(localStorage.getItem('completed_limit')) || 5 
-    }
+    pending: { page: 1, filterType: 'none', filterValue: '', dateStart: '', dateEnd: '', sort: localStorage.getItem('pending_sort') || 'priority_date', limit: parseInt(localStorage.getItem('pending_limit')) || 5 },
+    completed: { page: 1, filterType: 'none', filterValue: '', dateStart: '', dateEnd: '', sort: localStorage.getItem('completed_sort') || 'completion', limit: parseInt(localStorage.getItem('completed_limit')) || 5 }
 };
 
 const els = {
@@ -228,7 +215,9 @@ function processList(type, list, container) {
     container.innerHTML = paginated.map(t => `
         <div class="card task-card mb-2 border-start border-4 border-${getPriorityColor(t.priority)} ${t.isCompleted ? 'bg-light' : 'bg-white shadow-sm'}">
             <div class="card-body p-3 d-flex align-items-center">
-                <input type="checkbox" class="form-check-input me-3" onchange="toggleBulk('${t.id}', this.checked)" ${bulkSelection.has(t.id) ? 'checked' : ''}>
+                <input type="checkbox" class="form-check-input me-3" 
+                    onchange="toggleBulk('${type}', '${t.id}', this.checked)" 
+                    ${bulkSelection.type === type && bulkSelection.ids.has(t.id) ? 'checked' : ''}>
                 <div class="flex-grow-1" onclick="openEdit('${t.id}')" style="cursor:pointer">
                     <div class="${t.isCompleted ? 'text-decoration-line-through text-muted' : 'fw-bold'}">${t.name}</div>
                     <small class="text-muted"><i class="bi bi-clock"></i> ${t.dt.toLocaleString()}</small>
@@ -252,6 +241,7 @@ function processList(type, list, container) {
 const renderAll = () => {
     processList('pending', tasks.filter(t => !t.isCompleted), els.pendingTasks);
     processList('completed', tasks.filter(t => t.isCompleted), els.completedTasks);
+    updateBulkBarUI();
 };
 
 function handleFilterChange(type, filterType) {
@@ -285,7 +275,70 @@ function handleFilterChange(type, filterType) {
 }
 
 // ******************************************************
-// 6. MODAL DE TAREAS (FOCO Y VALIDACIÓN)
+// 6. GESTIÓN DE SELECCIÓN Y ACCIONES MASIVAS
+// ******************************************************
+
+window.toggleBulk = (listType, id, isChecked) => {
+    // Si se cambia de lista, se resetea la selección de la anterior
+    if (bulkSelection.type !== listType) {
+        bulkSelection.ids.clear();
+        bulkSelection.type = listType;
+        // Limpiar checkboxes globales visualmente
+        document.querySelectorAll('.bulk-checkbox-main').forEach(cb => cb.checked = false);
+    }
+
+    if (isChecked) bulkSelection.ids.add(id);
+    else bulkSelection.ids.delete(id);
+
+    updateBulkBarUI();
+};
+
+window.toggleSelectAll = (listType, isChecked) => {
+    const listTasks = tasks.filter(t => listType === 'pending' ? !t.isCompleted : t.isCompleted);
+    
+    if (bulkSelection.type !== listType) {
+        bulkSelection.ids.clear();
+        bulkSelection.type = listType;
+        // Desmarcar el checkbox "Marcar todo" de la otra columna
+        document.getElementById(listType === 'pending' ? 'selectAllCompleted' : 'selectAllPending').checked = false;
+    }
+
+    if (isChecked) {
+        listTasks.forEach(t => bulkSelection.ids.add(t.id));
+    } else {
+        bulkSelection.ids.clear();
+    }
+    
+    renderAll();
+};
+
+function updateBulkBarUI() {
+    const count = bulkSelection.ids.size;
+    if (count > 0) {
+        els.bulkBar.style.display = 'block';
+        document.getElementById('selected-count').textContent = `${count} seleccionadas (${bulkSelection.type === 'pending' ? 'Pendientes' : 'Completadas'})`;
+        
+        // Habilitar/Deshabilitar botones según el contexto
+        const isPending = bulkSelection.type === 'pending';
+        document.getElementById('bulk-complete-btn').style.display = isPending ? 'inline-block' : 'none';
+        document.getElementById('bulk-uncomplete-btn').style.display = !isPending ? 'inline-block' : 'none';
+    } else {
+        els.bulkBar.style.display = 'none';
+        bulkSelection.type = null;
+    }
+}
+
+window.processBulkAction = async (action) => {
+    if (bulkSelection.ids.size === 0) return;
+    await repo.bulkUpdate(firebaseUser.uid, bulkSelection.ids, action);
+    bulkSelection.ids.clear();
+    bulkSelection.type = null;
+    document.querySelectorAll('.bulk-checkbox-main').forEach(cb => cb.checked = false);
+    renderAll();
+};
+
+// ******************************************************
+// 7. MODAL DE TAREAS Y ALERTAS
 // ******************************************************
 els.taskModal.addEventListener('shown.bs.modal', () => {
     els.taskName.focus();
@@ -331,14 +384,10 @@ window.openEdit = (id) => {
     document.getElementById('taskDateTime').value = new Date(t.dateTime).toISOString().slice(0, 16);
     document.getElementById('taskPriority').value = t.priority;
     document.getElementById('taskNotes').value = t.notes || '';
-    // Al editar permitimos ver la fecha actual pero no poner una menor si se cambia
     document.getElementById('taskDateTime').min = ""; 
     new bootstrap.Modal(els.taskModal).show();
 };
 
-// ******************************************************
-// 7. ALERTAS Y ACCIONES DIRECTAS
-// ******************************************************
 function updateAlerts() {
     if (!userSettings.bellEnabled || !tasks.length) {
         els.notifCount.style.display = 'none';
@@ -376,7 +425,7 @@ window.quickAction = async (id, action) => {
 };
 
 // ******************************************************
-// 8. RESTO DE CONFIGURACIÓN Y EVENTOS
+// 8. CONFIGURACIÓN Y OTROS EVENTOS
 // ******************************************************
 window.prepareSettings = (type) => {
     document.getElementById('settingsListType').value = type;
@@ -431,20 +480,6 @@ document.getElementById('profileSettingsForm').onsubmit = async (e) => {
     await repo.saveSettings(firebaseUser.uid, userSettings);
     updateAlerts();
     bootstrap.Modal.getInstance(document.getElementById('profileSettingsModal')).hide();
-};
-
-window.toggleBulk = (id, checked) => {
-    if (checked) bulkSelection.add(id); else bulkSelection.delete(id);
-    const hasItems = bulkSelection.size > 0;
-    els.bulkBar.style.display = hasItems ? 'block' : 'none';
-    document.getElementById('selected-count').textContent = `${bulkSelection.size} seleccionadas`;
-    document.querySelectorAll('#bulk-action-bar button').forEach(b => b.disabled = !hasItems);
-};
-
-window.processBulkAction = async (action) => {
-    await repo.bulkUpdate(firebaseUser.uid, bulkSelection, action);
-    bulkSelection.clear();
-    els.bulkBar.style.display = 'none';
 };
 
 function renderPagination(type, totalItems, limit, currentPage) {

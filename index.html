@@ -72,7 +72,7 @@
 
                 <div class="mb-3 d-flex align-items-center px-2 flex-wrap gap-2">
                     <div class="form-check me-2">
-                        <input class="form-check-input bulk-checkbox" type="checkbox" id="selectAllPending">
+                        <input class="form-check-input bulk-checkbox-main" type="checkbox" id="selectAllPending" onchange="toggleSelectAll('pending', this.checked)">
                         <label class="form-check-label text-muted small user-select-none" for="selectAllPending">Marcar todo</label>
                     </div>
                     <div class="ms-auto d-flex align-items-center gap-2">
@@ -100,7 +100,7 @@
 
                 <div class="mb-3 d-flex align-items-center px-2 flex-wrap gap-2">
                     <div class="form-check me-2">
-                        <input class="form-check-input bulk-checkbox" type="checkbox" id="selectAllCompleted">
+                        <input class="form-check-input bulk-checkbox-main" type="checkbox" id="selectAllCompleted" onchange="toggleSelectAll('completed', this.checked)">
                         <label class="form-check-label text-muted small user-select-none" for="selectAllCompleted">Marcar todo</label>
                     </div>
                     <div class="ms-auto d-flex align-items-center gap-2">
@@ -124,13 +124,13 @@
         <div class="container d-flex justify-content-between align-items-center">
             <span id="selected-count" class="fw-bold small text-white-50">0 seleccionadas</span>
             <div>
-                <button id="bulk-complete-btn" class="btn btn-sm btn-success me-2 fw-bold" disabled onclick="processBulkAction('complete')">
+                <button id="bulk-complete-btn" class="btn btn-sm btn-success me-2 fw-bold" onclick="processBulkAction('complete')">
                     <i class="bi bi-check-lg me-1"></i> Completar
                 </button>
-                <button id="bulk-uncomplete-btn" class="btn btn-sm btn-warning me-2 fw-bold" disabled onclick="processBulkAction('uncomplete')">
+                <button id="bulk-uncomplete-btn" class="btn btn-sm btn-warning me-2 fw-bold" onclick="processBulkAction('uncomplete')">
                     <i class="bi bi-arrow-counterclockwise me-1"></i> Desmarcar
                 </button>
-                <button id="bulk-delete-btn" class="btn btn-sm btn-danger fw-bold" disabled onclick="processBulkAction('delete')">
+                <button id="bulk-delete-btn" class="btn btn-sm btn-danger fw-bold" onclick="processBulkAction('delete')">
                     <i class="bi bi-trash me-1"></i> Eliminar
                 </button>
            </div>
