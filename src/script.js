@@ -96,8 +96,15 @@ const repo = {
             return doc.exists ? doc.data().settings : null;
         }
     },
+    getUserData: async (uid) => {
+    const snap = await dbRT.ref(`users/${uid}`).once('value');
+    return snap.exists() ? snap.val() : null;
+    },
+    saveProfile: async (uid, profile) => {
+        return dbRT.ref(`users/${uid}/profile`).update(profile);
+    },
     saveSettings: async (uid, settings) => {
-        if (DB_TYPE === 'realtime') {
+         if (DB_TYPE === 'realtime') {
             return dbRT.ref(`users/${uid}/settings/prefs`).update(settings);
         } else {
             return dbFS.collection('users').doc(uid).set({ settings }, { merge: true });
@@ -455,31 +462,115 @@ document.getElementById('bellEnabled').onchange = (e) => document.getElementById
 document.getElementById('emailSummaryEnabled').onchange = (e) => document.getElementById('emailSummaryConfigContainer').style.display = e.target.checked ? 'block' : 'none';
 
 async function loadUserSettings() {
-    const data = await repo.getSettings(firebaseUser.uid);
-    if (data) {
-        userSettings = data;
-        document.getElementById('bellEnabled').checked = userSettings.bellEnabled;
-        document.getElementById('bellValue').value = userSettings.bellValue;
-        document.getElementById('bellUnit').value = userSettings.bellUnit;
-        document.getElementById('emailSummaryEnabled').checked = userSettings.emailSummaryEnabled;
-        document.getElementById('emailSummaryUnit').value = userSettings.emailSummaryUnit || 'mo';
-        document.getElementById('bellEnabled').dispatchEvent(new Event('change'));
-        document.getElementById('emailSummaryEnabled').dispatchEvent(new Event('change'));
+
+   // 1. Intentamos traer los datos de la base de datos
+    const data = await repo.getUserData(firebaseUser.uid);
+    const profile = data?.profile;
+
+    // 2. Referencias a los elementos de la interfaz (Navbar)
+    const navName = document.getElementById('user-display-name');
+    const navPhoto = document.getElementById('user-photo');
+
+    // 3. Si hay datos en la DB, los ponemos en el INICIO (Navbar)
+    if (profile) {
+       
+        // Actualiza el Inicio (Navbar)
+        if (profile.displayName) document.getElementById('user-display-name').textContent = profile.displayName;
+        if (profile.photoURL) document.getElementById('user-photo').src = profile.photoURL;
+        
+        // Rellena el Modal
+        document.getElementById('profileDisplayName').value = profile.displayName;
+        document.getElementById('profileEmail').value = profile.email;
+        document.getElementById('profilePreview').src = profile.photoURL;
     }
+
+    // 4. También rellenamos los campos del MODAL para que coincidan
+    const modalNameInput = document.getElementById('profileDisplayName');
+    const modalEmailInput = document.getElementById('profileEmail');
+    const modalPreview = document.getElementById('profilePreview');
+
+    if (modalNameInput) modalNameInput.value = profile?.displayName || firebaseUser.displayName || "";
+    if (modalEmailInput) modalEmailInput.value = profile?.email || firebaseUser.email || "";
+    if (modalPreview) modalPreview.src = profile?.photoURL || firebaseUser.photoURL || "https://via.placeholder.com/80";
 }
 
-document.getElementById('profileSettingsForm').onsubmit = async (e) => {
-    e.preventDefault();
-    userSettings = {
-        bellEnabled: document.getElementById('bellEnabled').checked,
-        bellValue: parseInt(document.getElementById('bellValue').value),
-        bellUnit: document.getElementById('bellUnit').value,
-        emailSummaryEnabled: document.getElementById('emailSummaryEnabled').checked,
-        emailSummaryUnit: document.getElementById('emailSummaryUnit').value
+// Mostrar la imagen en el modal en cuanto se selecciona el archivo
+// ESCUCHADOR PARA LA PREVISUALIZACIÓN Y COMPRESIÓN
+document.getElementById('profileFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+            // REDIMENSIONAR IMAGEN a 200x200 para que no pese nada
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 200;
+            canvas.height = 200;
+            ctx.drawImage(img, 0, 0, 200, 200);
+            
+            // Guardar el resultado comprimido en la previsualización
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+            document.getElementById('profilePreview').src = dataUrl;
+        };
+        img.src = event.target.result;
     };
-    await repo.saveSettings(firebaseUser.uid, userSettings);
-    updateAlerts();
-    bootstrap.Modal.getInstance(document.getElementById('profileSettingsModal')).hide();
+    reader.readAsDataURL(file);
+});
+    
+document.getElementById('profileSettingsForm').onsubmit = async (e) => {
+   e.preventDefault();
+    const statusText = document.getElementById('uploadStatus');
+    const newName = document.getElementById('profileDisplayName').value;
+    const newEmail = document.getElementById('profileEmail').value;
+    const photoURL = document.getElementById('profilePreview').src; // La imagen ya comprimida
+
+    statusText.classList.remove('d-none');
+
+    try {
+        // 1. Guardar en la Base de Datos
+        await repo.saveProfile(firebaseUser.uid, { 
+            displayName: newName, 
+            photoURL: photoURL,
+            email: newEmail 
+        });
+
+        // 2. ACTUALIZAR AREA DE INICIO (Navbar)
+        if(document.getElementById('user-display-name')) {
+            document.getElementById('user-display-name').textContent = newName;
+        }
+        if(document.getElementById('user-photo')) {
+            document.getElementById('user-photo').src = photoURL;
+        }
+        if(document.getElementById('user-email')) {
+            document.getElementById('user-email').textContent = newEmail;
+        }
+
+        // 3. Guardar otros ajustes (si los tienes)
+        userSettings = {
+            bellEnabled: document.getElementById('bellEnabled').checked,
+            bellValue: parseInt(document.getElementById('bellValue').value),
+            bellUnit: document.getElementById('bellUnit').value,
+            emailSummaryEnabled: document.getElementById('emailSummaryEnabled').checked,
+            emailSummaryUnit: document.getElementById('emailSummaryUnit').value
+        };
+        await repo.saveSettings(firebaseUser.uid, userSettings);
+
+        // 4. CERRAR MODAL
+        const modalEl = document.getElementById('profileSettingsModal');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
+
+        alert("¡Perfil actualizado en todas las áreas!");
+
+    } catch (error) {
+        console.error("Error:", error);
+        alert("Error al guardar. Intenta con otra imagen.");
+    } finally {
+        statusText.classList.add('d-none');
+    }
 };
 
 function renderPagination(type, totalItems, limit, currentPage) {

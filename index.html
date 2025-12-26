@@ -19,7 +19,7 @@
             <div id="auth-section" class="d-flex align-items-center ms-auto">
                 <div id="notifications-area" class="dropdown me-4 d-none-auth">
                     <button id="notification-bell" class="btn btn-light position-relative rounded-circle shadow-sm" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Alertas">
-                        <i class="bi bi-bell text-secondary" style="font-size: 1.3rem;"></i>
+                       <i class="bi bi-bell text-secondary" style="font-size: 1.3rem;"></i>
                         <span id="notif-count" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light" style="display: none;">0</span>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end notification-dropdown-menu shadow-lg border-0" style="width: 320px; max-height: 400px; overflow-y: auto;">
@@ -32,6 +32,7 @@
                     <button class="btn btn-white border shadow-sm btn-sm dropdown-toggle d-flex align-items-center gap-2 rounded-pill px-3 py-1" type="button" data-bs-toggle="dropdown">
                         <i class="bi bi-person-circle fs-5 text-secondary"></i>
                         <span id="user-display-name" class="fw-bold d-none d-sm-inline text-dark">Usuario</span>
+                        <img id="user-photo" src="https://via.placeholder.com/40" class="rounded-circle border shadow-sm" width="40" height="40">
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2">
                         <li>
@@ -72,7 +73,7 @@
 
                 <div class="mb-3 d-flex align-items-center px-2 flex-wrap gap-2">
                     <div class="form-check me-2">
-                        <input class="form-check-input bulk-checkbox-main" type="checkbox" id="selectAllPending" onchange="toggleSelectAll('pending', this.checked)">
+                        <input class="form-check-input bulk-checkbox" type="checkbox" id="selectAllPending">
                         <label class="form-check-label text-muted small user-select-none" for="selectAllPending">Marcar todo</label>
                     </div>
                     <div class="ms-auto d-flex align-items-center gap-2">
@@ -100,7 +101,7 @@
 
                 <div class="mb-3 d-flex align-items-center px-2 flex-wrap gap-2">
                     <div class="form-check me-2">
-                        <input class="form-check-input bulk-checkbox-main" type="checkbox" id="selectAllCompleted" onchange="toggleSelectAll('completed', this.checked)">
+                        <input class="form-check-input bulk-checkbox" type="checkbox" id="selectAllCompleted">
                         <label class="form-check-label text-muted small user-select-none" for="selectAllCompleted">Marcar todo</label>
                     </div>
                     <div class="ms-auto d-flex align-items-center gap-2">
@@ -124,13 +125,13 @@
         <div class="container d-flex justify-content-between align-items-center">
             <span id="selected-count" class="fw-bold small text-white-50">0 seleccionadas</span>
             <div>
-                <button id="bulk-complete-btn" class="btn btn-sm btn-success me-2 fw-bold" onclick="processBulkAction('complete')">
+                <button id="bulk-complete-btn" class="btn btn-sm btn-success me-2 fw-bold" disabled onclick="processBulkAction('complete')">
                     <i class="bi bi-check-lg me-1"></i> Completar
                 </button>
-                <button id="bulk-uncomplete-btn" class="btn btn-sm btn-warning me-2 fw-bold" onclick="processBulkAction('uncomplete')">
+                <button id="bulk-uncomplete-btn" class="btn btn-sm btn-warning me-2 fw-bold" disabled onclick="processBulkAction('uncomplete')">
                     <i class="bi bi-arrow-counterclockwise me-1"></i> Desmarcar
                 </button>
-                <button id="bulk-delete-btn" class="btn btn-sm btn-danger fw-bold" onclick="processBulkAction('delete')">
+                <button id="bulk-delete-btn" class="btn btn-sm btn-danger fw-bold" disabled onclick="processBulkAction('delete')">
                     <i class="bi bi-trash me-1"></i> Eliminar
                 </button>
            </div>
@@ -217,6 +218,31 @@
                 </div>
                 <div class="modal-body px-4 pb-4">
                     <form id="profileSettingsForm">
+                        
+                        <div class="mb-4 text-center">
+    <h6 class="fw-bold text-dark mb-3 text-start"><i class="bi bi-person-circle me-2 text-primary"></i>Información Personal</h6>
+    <div class="card bg-light border-0 rounded-3 p-3">
+        <div class="position-relative d-inline-block mb-3">
+            <img id="profilePreview" src="https://via.placeholder.com/80" class="rounded-circle border shadow-sm" style="width: 80px; height: 80px; object-fit: cover;">
+        </div>
+        
+        <div class="mb-3 text-start">
+            <label class="small text-muted mb-1 fw-bold">Nombre</label>
+            <input type="text" class="form-control" id="profileDisplayName">
+        </div>
+        <div class="mb-3 text-start">
+            <label class="small text-muted mb-1 fw-bold">Correo</label>
+            <input type="email" class="form-control" id="profileEmail">
+        </div>
+        <div class="mb-0 text-start">
+            <label class="small text-muted mb-1 fw-bold">Subir nueva foto</label>
+            <input type="file" class="form-control" id="profileFile" accept="image/*">
+            <div id="uploadStatus" class="small mt-1 text-primary d-none">Guardando cambios...</div>
+        </div>
+    </div>
+</div>
+                           
+
                         <div class="mb-4">
                             <h6 class="fw-bold text-dark mb-3">🔔 Alertas Visuales (Campana)</h6>
                             <div class="card bg-light border-0 rounded-3 p-3">
