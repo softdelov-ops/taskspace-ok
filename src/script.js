@@ -286,34 +286,43 @@ function handleFilterChange(type, filterType) {
 // ******************************************************
 
 window.toggleBulk = (listType, id, isChecked) => {
-    // Si se cambia de lista, se resetea la selección de la anterior
-    if (bulkSelection.type !== listType) {
+    // Si se cambia de lista, se resetea la selección de la anterior por ser excluyentes
+    if (bulkSelection.type && bulkSelection.type !== listType) {
         bulkSelection.ids.clear();
-        bulkSelection.type = listType;
-        // Limpiar checkboxes globales visualmente
-        document.querySelectorAll('.bulk-checkbox-main').forEach(cb => cb.checked = false);
+        // Desmarcar visualmente los checkboxes de "Marcar todo"
+        document.getElementById('selectAllPending').checked = false;
+        document.getElementById('selectAllCompleted').checked = false;
+    }
+    
+    bulkSelection.type = listType;
+
+    if (isChecked) {
+        bulkSelection.ids.add(id);
+    } else {
+        bulkSelection.ids.delete(id);
+        // Si no quedan IDs, el tipo vuelve a ser null
+        if (bulkSelection.ids.size === 0) bulkSelection.type = null;
     }
 
-    if (isChecked) bulkSelection.ids.add(id);
-    else bulkSelection.ids.delete(id);
-
-    updateBulkBarUI();
+    renderAll(); // Renderizamos para que los checkboxes reflejen el estado real
 };
 
 window.toggleSelectAll = (listType, isChecked) => {
-    const listTasks = tasks.filter(t => listType === 'pending' ? !t.isCompleted : t.isCompleted);
-    
+    // Limpiar selección de la OTRA lista antes de marcar la actual
     if (bulkSelection.type !== listType) {
         bulkSelection.ids.clear();
-        bulkSelection.type = listType;
-        // Desmarcar el checkbox "Marcar todo" de la otra columna
-        document.getElementById(listType === 'pending' ? 'selectAllCompleted' : 'selectAllPending').checked = false;
+        const otherType = listType === 'pending' ? 'Completed' : 'Pending';
+        document.getElementById(`selectAll${otherType}`).checked = false;
     }
+
+    bulkSelection.type = listType;
+    const listTasks = tasks.filter(t => listType === 'pending' ? !t.isCompleted : t.isCompleted);
 
     if (isChecked) {
         listTasks.forEach(t => bulkSelection.ids.add(t.id));
     } else {
         bulkSelection.ids.clear();
+        bulkSelection.type = null;
     }
     
     renderAll();
@@ -321,14 +330,28 @@ window.toggleSelectAll = (listType, isChecked) => {
 
 function updateBulkBarUI() {
     const count = bulkSelection.ids.size;
-    if (count > 0) {
+    const hasSelection = count > 0;
+
+    if (hasSelection) {
         els.bulkBar.style.display = 'block';
-        document.getElementById('selected-count').textContent = `${count} seleccionadas (${bulkSelection.type === 'pending' ? 'Pendientes' : 'Completadas'})`;
+        document.getElementById('selected-count').textContent = 
+            `${count} seleccionadas (${bulkSelection.type === 'pending' ? 'Pendientes' : 'Completadas'})`;
         
-        // Habilitar/Deshabilitar botones según el contexto
         const isPending = bulkSelection.type === 'pending';
-        document.getElementById('bulk-complete-btn').style.display = isPending ? 'inline-block' : 'none';
-        document.getElementById('bulk-uncomplete-btn').style.display = !isPending ? 'inline-block' : 'none';
+        
+        // Control de visibilidad y estado de botones
+        const btnComplete = document.getElementById('bulk-complete-btn');
+        const btnUncomplete = document.getElementById('bulk-uncomplete-btn');
+        const btnDelete = document.getElementById('bulk-delete-btn');
+
+        // Mostrar solo botones relevantes al contexto
+        btnComplete.style.display = isPending ? 'inline-block' : 'none';
+        btnUncomplete.style.display = !isPending ? 'inline-block' : 'none';
+
+        // ACTIVACIÓN DE BOTONES: Quitar el atributo disabled si hay selección
+        btnComplete.disabled = !hasSelection;
+        btnUncomplete.disabled = !hasSelection;
+        btnDelete.disabled = !hasSelection;
     } else {
         els.bulkBar.style.display = 'none';
         bulkSelection.type = null;
@@ -344,6 +367,8 @@ window.processBulkAction = async (action) => {
     renderAll();
 };
 
+
+
 // ******************************************************
 // 7. MODAL DE TAREAS Y ALERTAS
 // ******************************************************
@@ -351,11 +376,26 @@ els.taskModal.addEventListener('shown.bs.modal', () => {
     els.taskName.focus();
 });
 
+// Función auxiliar para obtener fecha local en formato compatible con input datetime-local
+/*function getLocalISOString(date = new Date()) {
+    const offset = date.getTimezoneOffset() * 60000; // Desfase en milisegundos
+    const localISOTime = (new Date(date - offset)).toISOString().slice(0, 16);
+    return localISOTime;
+}*/
+
+function getLocalISOString(date = new Date()) {
+    const offset = date.getTimezoneOffset() * 60000; 
+    return (new Date(date - offset)).toISOString().slice(0, 16);
+}
+
 document.getElementById('add-task-btn').onclick = () => {
     els.taskForm.reset();
     document.getElementById('taskID').value = '';
-    const now = new Date().toISOString().slice(0, 16);
-    document.getElementById('taskDateTime').min = now;
+    
+    // Configura el mínimo y el valor por defecto como "Ahora"
+    const nowLocal = getLocalISOString();
+    document.getElementById('taskDateTime').value = nowLocal;
+    document.getElementById('taskDateTime').min = nowLocal;
 };
 
 els.taskForm.onsubmit = async (e) => {
@@ -364,8 +404,10 @@ els.taskForm.onsubmit = async (e) => {
     const dtValue = document.getElementById('taskDateTime').value;
     const dt = new Date(dtValue).getTime();
 
+    // Permite fechas iguales a la actual (Date.now()), pero no menores
+    // Se resta un minuto (60000ms) para dar margen de tiempo al usuario mientras llena el formulario
     if (dt < (Date.now() - 60000) && !id) {
-        alert("⚠️ La fecha de vencimiento no puede ser anterior a la actual.");
+        alert("⚠️ La fecha de vencimiento debe ser hoy o una fecha futura.");
         return;
     }
 
@@ -386,12 +428,22 @@ els.taskForm.onsubmit = async (e) => {
 window.openEdit = (id) => {
     const t = tasks.find(x => x.id === id);
     if (!t) return;
+
+    const nowLocal = getLocalISOString(); //
+    
     document.getElementById('taskID').value = t.id;
     document.getElementById('taskName').value = t.name;
-    document.getElementById('taskDateTime').value = new Date(t.dateTime).toISOString().slice(0, 16);
+    
+    // Cargar fecha guardada ajustada a la zona horaria local
+    const taskDateLocal = getLocalISOString(new Date(t.dateTime));
+    document.getElementById('taskDateTime').value = taskDateLocal;
+    
+    // COMPORTAMIENTO IGUAL AL CREAR: La fecha mínima es la actual
+    // Si la tarea ya venció, permitimos su valor actual para que no falle la validación al guardar
+    document.getElementById('taskDateTime').min = t.dateTime < Date.now() ? taskDateLocal : nowLocal; 
+    
     document.getElementById('taskPriority').value = t.priority;
     document.getElementById('taskNotes').value = t.notes || '';
-    document.getElementById('taskDateTime').min = ""; 
     new bootstrap.Modal(els.taskModal).show();
 };
 
@@ -588,3 +640,6 @@ window.deleteTask = (id) => confirm('¿Eliminar?') && repo.deleteTask(firebaseUs
 els.loginBtn.onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
 els.logoutBtn.onclick = () => auth.signOut();
 document.querySelectorAll('[data-bs-target="#settingsModal"]').forEach(btn => btn.onclick = () => prepareSettings(btn.getAttribute('data-list-type')));
+
+document.getElementById('selectAllPending').onchange = (e) => toggleSelectAll('pending', e.target.checked);
+document.getElementById('selectAllCompleted').onchange = (e) => toggleSelectAll('completed', e.target.checked);
