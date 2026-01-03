@@ -219,7 +219,7 @@ function processList(type, list, container) {
     if (s.page > totalPages) s.page = totalPages;
     const paginated = processedList.slice((s.page - 1) * s.limit, s.page * s.limit);
 
-    container.innerHTML = paginated.map(t => `
+   container.innerHTML = paginated.map(t => `
         <div class="card task-card mb-2 border-start border-4 border-${getPriorityColor(t.priority)} ${t.isCompleted ? 'bg-light' : 'bg-white shadow-sm'}">
             <div class="card-body p-3 d-flex align-items-center">
                 <input type="checkbox" class="form-check-input me-3" 
@@ -228,19 +228,22 @@ function processList(type, list, container) {
                 <div class="flex-grow-1" onclick="openEdit('${t.id}')" style="cursor:pointer">
                     <div class="${t.isCompleted ? 'text-decoration-line-through text-muted' : 'fw-bold'}">${t.name}</div>
                     <small class="text-muted"><i class="bi bi-clock"></i> ${t.dt.toLocaleString()}</small>
-                    ${t.completedAt ? `<br><small class="text-success" style="font-size:0.7rem">Terminada: ${new Date(t.completedAt).toLocaleString()}</small>` : ''}
                 </div>
                 <div class="d-flex gap-1">
                     ${!t.isCompleted ? `
                         <button class="btn btn-sm btn-outline-success border-0" onclick="quickAction('${t.id}', 'complete')" title="Completar">
                             <i class="bi bi-check-circle"></i>
                         </button>
-                    ` : ''}
+                    ` : `
+                        <button class="btn btn-sm btn-outline-warning border-0" onclick="quickAction('${t.id}', 'uncomplete')" title="Desmarcar">
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                    `}
                     <button class="btn btn-sm text-danger border-0" onclick="deleteTask('${t.id}')"><i class="bi bi-trash"></i></button>
                 </div>
             </div>
         </div>
-    `).join('') || '<p class="text-center text-muted py-3">No hay tareas que coincidan</p>';
+    `).join('') || '<p class="text-center text-muted py-3">No hay tareas</p>';
 
     renderPagination(type, processedList.length, s.limit, s.page);
 }
@@ -338,20 +341,17 @@ function updateBulkBarUI() {
             `${count} seleccionadas (${bulkSelection.type === 'pending' ? 'Pendientes' : 'Completadas'})`;
         
         const isPending = bulkSelection.type === 'pending';
-        
-        // Control de visibilidad y estado de botones
         const btnComplete = document.getElementById('bulk-complete-btn');
         const btnUncomplete = document.getElementById('bulk-uncomplete-btn');
         const btnDelete = document.getElementById('bulk-delete-btn');
 
-        // Mostrar solo botones relevantes al contexto
         btnComplete.style.display = isPending ? 'inline-block' : 'none';
         btnUncomplete.style.display = !isPending ? 'inline-block' : 'none';
 
-        // ACTIVACIÓN DE BOTONES: Quitar el atributo disabled si hay selección
-        btnComplete.disabled = !hasSelection;
-        btnUncomplete.disabled = !hasSelection;
-        btnDelete.disabled = !hasSelection;
+        // Activar botones solo si hay selección
+        btnComplete.disabled = false;
+        btnUncomplete.disabled = false;
+        btnDelete.disabled = false;
     } else {
         els.bulkBar.style.display = 'none';
         bulkSelection.type = null;
@@ -429,22 +429,48 @@ window.openEdit = (id) => {
     const t = tasks.find(x => x.id === id);
     if (!t) return;
 
-    const nowLocal = getLocalISOString(); //
+    const isDone = t.isCompleted;
+    const nowLocal = getLocalISOString();
     
+    // Rellenar campos
     document.getElementById('taskID').value = t.id;
     document.getElementById('taskName').value = t.name;
-    
-    // Cargar fecha guardada ajustada a la zona horaria local
     const taskDateLocal = getLocalISOString(new Date(t.dateTime));
     document.getElementById('taskDateTime').value = taskDateLocal;
-    
-    // COMPORTAMIENTO IGUAL AL CREAR: La fecha mínima es la actual
-    // Si la tarea ya venció, permitimos su valor actual para que no falle la validación al guardar
-    document.getElementById('taskDateTime').min = t.dateTime < Date.now() ? taskDateLocal : nowLocal; 
-    
     document.getElementById('taskPriority').value = t.priority;
     document.getElementById('taskNotes').value = t.notes || '';
+
+    // MODO SOLO LECTURA SI ESTÁ COMPLETADA
+    const fields = ['taskName', 'taskDateTime', 'taskPriority', 'taskNotes'];
+    fields.forEach(field => document.getElementById(field).disabled = isDone);
+    
+    document.getElementById('saveTaskBtn').style.display = isDone ? 'none' : 'block';
+    document.getElementById('modalTitle').textContent = isDone ? 'Detalle de Tarea (Completada)' : 'Editar Tarea';
+
+    if (!isDone) {
+        // Permitir fecha igual a la actual pero no menor
+        document.getElementById('taskDateTime').min = t.dateTime < Date.now() ? taskDateLocal : nowLocal;
+    }
+
     new bootstrap.Modal(els.taskModal).show();
+};
+
+// IMPORTANTE: Resetear el estado de los campos al abrir para crear nueva tarea
+document.getElementById('add-task-btn').onclick = () => {
+    els.taskForm.reset();
+    document.getElementById('taskID').value = '';
+    document.getElementById('modalTitle').textContent = 'Nueva Tarea';
+    
+    // Habilitar campos
+    document.getElementById('taskName').disabled = false;
+    document.getElementById('taskDateTime').disabled = false;
+    document.getElementById('taskPriority').disabled = false;
+    document.getElementById('taskNotes').disabled = false;
+    document.getElementById('saveTaskBtn').style.display = 'block';
+
+    const nowLocal = getLocalISOString();
+    document.getElementById('taskDateTime').value = nowLocal;
+    document.getElementById('taskDateTime').min = nowLocal;
 };
 
 function updateAlerts() {
@@ -480,6 +506,7 @@ function updateAlerts() {
 }
 
 window.quickAction = async (id, action) => {
+    // action puede ser 'complete' o 'uncomplete'
     await repo.bulkUpdate(firebaseUser.uid, [id], action);
 };
 
