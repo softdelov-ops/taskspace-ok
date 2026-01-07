@@ -428,56 +428,69 @@
           </div>
           <div class="modal-body px-4 pb-4">
             <form id="profileSettingsForm">
-
-             <div class="accordion accordion-flush mb-4" id="accordionSettings">
+             
+                <div class="accordion accordion-flush mb-4" id="accordionSettings">
     
-    <div class="accordion-item border-0 mb-2 shadow-sm rounded-3 overflow-hidden">
+    <div class="accordion-item">
         <h2 class="accordion-header">
-            <button class="accordion-button fw-bold text-dark bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePersonal">
-                <i class="bi bi-person-circle me-2 text-primary"></i> Información Personal
+            <button class="accordion-button fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePersonal">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box me-3 bg-primary-subtle p-2 rounded-3">
+                        <i class="bi bi-person-circle text-primary"></i>
+                    </div>
+                    <span>Información Personal</span>
+                </div>
             </button>
         </h2>
         <div id="collapsePersonal" class="accordion-collapse collapse show" data-bs-parent="#accordionSettings">
-            <div class="accordion-body bg-light">
-                <div class="text-center mb-3">
+            <div class="accordion-body">
+                <div class="text-center mb-4">
                     <div class="position-relative d-inline-block">
-                        <img id="profilePreview" src="https://via.placeholder.com/80" class="rounded-circle border shadow-sm" style="width: 80px; height: 80px; object-fit: cover;">
+                        <img id="profilePreview" src="https://via.placeholder.com/100" class="rounded-circle border border-4 border-white shadow-sm" style="width: 100px; height: 100px; object-fit: cover;">
+                        <label for="profileFile" class="btn btn-sm btn-dark position-absolute bottom-0 end-0 rounded-circle">
+                            <i class="bi bi-camera"></i>
+                        </label>
                     </div>
                 </div>
-                <div class="mb-3">
-                    <label class="small text-muted mb-1 fw-bold">Nombre</label>
-                    <input type="text" class="form-control" id="profileDisplayName">
-                </div>
-                <div class="mb-3">
-                    <label class="small text-muted mb-1 fw-bold">Correo</label>
-                    <input type="email" class="form-control" id="profileEmail">
-                </div>
-                <div class="mb-0">
-                    <label class="small text-muted mb-1 fw-bold">Subir nueva foto</label>
-                    <input type="file" class="form-control" id="profileFile" accept="image/*">
-                    <div id="uploadStatus" class="small mt-1 text-primary d-none">Guardando cambios...</div>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label small fw-bold text-muted">Nombre Completo</label>
+                        <input type="text" class="form-control" id="profileDisplayName" placeholder="Ej. Juan Pérez">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-bold text-muted">Correo Electrónico</label>
+                        <input type="email" class="form-control" id="profileEmail" placeholder="juan@ejemplo.com">
+                    </div>
+                    <input type="file" class="d-none" id="profileFile" accept="image/*">
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="accordion-item border-0 mb-2 shadow-sm rounded-3 overflow-hidden">
+    <div class="accordion-item">
         <h2 class="accordion-header">
-            <button class="accordion-button collapsed fw-bold text-dark bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAlerts">
-                <i class="bi bi-bell-fill me-2 text-warning"></i> Alertas Visuales
+            <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAlerts">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box me-3 bg-warning-subtle p-2 rounded-3">
+                        <i class="bi bi-bell-fill text-warning"></i>
+                    </div>
+                    <span>Alertas Visuales</span>
+                </div>
             </button>
         </h2>
         <div id="collapseAlerts" class="accordion-collapse collapse" data-bs-parent="#accordionSettings">
-            <div class="accordion-body bg-light">
-                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
-                    <label class="form-check-label fw-bold" for="bellEnabled">Notificar vencimientos</label>
-                    <input class="form-check-input ms-0" type="checkbox" id="bellEnabled" checked>
+            <div class="accordion-body">
+                <div class="p-3 border rounded-3 bg-white mb-3">
+                    <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0">
+                        <label class="form-check-label fw-semibold" for="bellEnabled">Notificar vencimientos</label>
+                        <input class="form-check-input ms-0" type="checkbox" id="bellEnabled" checked style="width: 2.5em; height: 1.25em;">
+                    </div>
                 </div>
-                <div id="bellConfigContainer" class="mt-2 border-top pt-2">
-                    <label class="small text-muted mb-2">Avisar con anticipación de:</label>
-                    <div class="input-group input-group-sm">
+                <div id="bellConfigContainer" class="mt-3">
+                    <label class="small text-muted mb-2 d-block">Avisar con anticipación de:</label>
+                    <div class="input-group">
                         <input type="number" class="form-control" id="bellValue" min="1" value="1">
-                        <select class="form-select" id="bellUnit">
+                        <select class="form-select w-50" id="bellUnit">
                             <option value="m">Minutos</option>
                             <option value="h" selected>Horas</option>
                             <option value="d">Días</option>
@@ -487,33 +500,49 @@
             </div>
         </div>
     </div>
-
-    <div class="accordion-item border-0 mb-2 shadow-sm rounded-3 overflow-hidden">
+    <div class="accordion-item">
         <h2 class="accordion-header">
-            <button class="accordion-button collapsed fw-bold text-dark bg-white" type="button" data-bs-toggle="collapse" data-bs-target="#collapseEmail">
-                <i class="bi bi-envelope-fill me-2 text-info"></i> Resumen por Email
+            <button class="accordion-button collapsed fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseEmail">
+                <div class="d-flex align-items-center">
+                    <div class="icon-box me-3 bg-info-subtle p-2 rounded-3">
+                        <i class="bi bi-envelope-at-fill text-info"></i>
+                    </div>
+                    <span>Resumen por Email</span>
+                </div>
             </button>
         </h2>
         <div id="collapseEmail" class="accordion-collapse collapse" data-bs-parent="#accordionSettings">
-            <div class="accordion-body bg-light">
-                <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0 mb-2">
-                    <label class="form-check-label fw-bold" for="emailSummaryEnabled">Recibir correo automático</label>
-                    <input class="form-check-input ms-0" type="checkbox" id="emailSummaryEnabled">
+            <div class="accordion-body">
+                <div class="p-3 border rounded-4 bg-white mb-3 shadow-sm">
+                    <div class="form-check form-switch d-flex justify-content-between align-items-center ps-0">
+                        <div>
+                            <label class="form-check-label fw-bold d-block" for="emailSummaryEnabled">Reporte Automático</label>
+                            <small class="text-muted">Recibe tus tareas pendientes en tu correo.</small>
+                        </div>
+                        <input class="form-check-input ms-0" type="checkbox" id="emailSummaryEnabled" style="width: 2.5em; height: 1.25em;">
+                    </div>
                 </div>
-                <div id="emailSummaryConfigContainer" class="mt-2 border-top pt-2" style="display: none;">
-                    <label class="small text-muted mb-2">Frecuencia de envío:</label>
-                    <select class="form-select form-select-sm" id="emailSummaryUnit">
-                        <option value="d">Diario</option>
-                        <option value="w">Semanal</option>
-                        <option value="mo">Mensual</option>
-                        <option value="y">Anual</option>
-                    </select>
+
+                <div id="emailSummaryConfigContainer" class="mt-3 animate__animated animate__fadeIn" style="display: none;">
+                    <label class="small text-muted mb-2 fw-bold d-block text-uppercase italic">Frecuencia del reporte</label>
+                    <div class="position-relative">
+                        <select class="form-select form-select-lg shadow-sm border-0 bg-light" id="emailSummaryUnit" style="font-size: 0.95rem;">
+                            <option value="d">🕒 Diario (Todas las mañanas)</option>
+                            <option value="w">📅 Semanal (Lunes vtos.)</option>
+                            <option value="mo">🗓️ Mensual (Cierre de mes)</option>
+                            <option value="y">🏆 Anual (Resumen de logros)</option>
+                        </select>
+                    </div>
+                    <div class="alert alert-info mt-3 py-2 border-0 rounded-3 shadow-sm" style="font-size: 0.85rem;">
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                        Te enviaremos un resumen de las tareas que vencen pronto.
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
+                
               <div class="d-flex gap-2">
                 <button
                   type="button"

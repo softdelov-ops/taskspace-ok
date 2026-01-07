@@ -1,72 +1,169 @@
+:root {
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --primary-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    --shadow-soft: 0 8px 30px rgba(0,0,0,0.05);
+}
+
 body { 
-    font-family: 'Roboto', sans-serif;
-    background-color: #f0f2f5; 
+    font-family: 'Inter', 'Roboto', sans-serif;
+    background: linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%);
+    min-height: 100vh;
 }
 
-/* Colores de Prioridad */
-.priority-color-urgente { color: #dc3545 !important; font-weight: bold; }
-.priority-color-alta { color: #fd7e14 !important; font-weight: bold; }
-.priority-color-media { color: #0d6efd !important; font-weight: bold; }
-.priority-color-baja { color: #6c757d !important; font-weight: bold; }
+/* Navbar Estilo Glass */
+.navbar {
+    background: var(--glass-bg) !important;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--glass-border);
+}
 
-#taskPriority, #taskPriority option { font-weight: bold; }
-
-/* Estilos de Tarjeta */
+/* Tarjetas de Tarea Modernas */
 .task-card { 
-    transition: all 0.2s ease-in-out;
-    border-radius: 12px; 
-    border: 0; 
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 16px !important; 
+    border: 1px solid rgba(0,0,0,0.05) !important;
     background: white;
+    margin-bottom: 12px;
 }
+
 .task-card:hover { 
-    transform: translateY(-3px);
-    box-shadow: 0 .5rem 1rem rgba(0,0,0,.10)!important; 
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.1) !important;
 }
 
-/* Bordes laterales por prioridad */
-.task-card.border-danger { border-left: 5px solid #dc3545 !important; } 
-.task-card.border-warning { border-left: 5px solid #fd7e14 !important; } 
-.task-card.border-info { border-left: 5px solid #0d6efd !important; } 
-.task-card.border-secondary { border-left: 5px solid #6c757d !important; }
-.task-card.border-success { border-left: 5px solid #198754 !important; }
-
-/* Estilo Tarea Completada */
-.task-card.completed { opacity: 0.8; background-color: #f8f9fa; }
-.task-card.completed .card-title { text-decoration: line-through; color: #6c757d; }
-.task-card.bg-light { background-color: #e2e6ea !important; } 
-
-/* Utilidades */
-.d-none-auth { display: none !important; }
-.cursor-pointer { cursor: pointer; }
-.task-info-small { font-size: 0.75rem; color: #adb5bd; }
-.task-info-small.text-success { color: #198754 !important; }
-
-/* Dropdown de Notificaciones */
-.notification-dropdown-menu {
-    width: 360px;
-    max-height: 450px;
-    overflow-y: auto;
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-    border: none;
-    z-index: 2000;
-}
-.notification-item { border-bottom: 1px solid #f0f0f0; padding: 12px 20px; transition: background 0.2s; }
-.notification-item:hover { background-color: #f8f9fa; }
-
-/* Barra de Acción Masiva */
-#bulk-action-bar { z-index: 1060; border-top-left-radius: 16px; border-top-right-radius: 16px; }
-
-/* Limpieza estética del acordeón */
+/* Acordeón de Configuración Moderno */
 .accordion-item {
-    border: none;
+    border: none !important;
+    margin-bottom: 1rem;
+    border-radius: 12px !important;
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
 }
-.accordion-button:focus {
-    box-shadow: none;
-    background-color: #fff;
+
+.accordion-button {
+    background-color: white !important;
+    font-weight: 600;
+    color: #4b5563;
 }
+
 .accordion-button:not(.collapsed) {
-    color: var(--bs-primary);
-    background-color: #fff;
-    box-shadow: inset 0 -1px 0 rgba(0,0,0,.125);
+    background: var(--primary-gradient) !important;
+    color: white !important;
+}
+
+.accordion-button:not(.collapsed)::after {
+    filter: brightness(0) invert(1);
+}
+
+/* Botones con degradado */
+.btn-primary {
+    background: var(--primary-gradient);
+    border: none;
+    transition: opacity 0.2s;
+}
+
+.btn-primary:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+/* Barra de Acción Masiva Flotante */
+#bulk-action-bar {
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 600px;
+    border-radius: 50px;
+    backdrop-filter: blur(15px);
+    background: rgba(31, 41, 55, 0.95);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Responsividad mejorada */
+@media (max-width: 768px) {
+    .container { padding-left: 15px; padding-right: 15px; }
+    .display-name { display: none; }
+    .navbar-brand { font-size: 1.2rem; }
+}
+
+/* --- ESTILO DE FILAS DE TAREAS --- */
+.task-card {
+    transition: all 0.3s ease;
+    border: none !important;
+    border-radius: 12px !important;
+    margin-bottom: 12px !important;
+    background: #ffffff;
+}
+
+.task-card:hover {
+    transform: translateX(5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08) !important;
+}
+
+/* Indicador de prioridad fino a la izquierda */
+.border-indicator {
+    width: 5px;
+    border-radius: 10px 0 0 10px;
+}
+
+/* Checkbox circular moderno */
+.task-check-input {
+    width: 1.3em !important;
+    height: 1.3em !important;
+    cursor: pointer;
+    border-radius: 50% !important; /* Checkboxes circulares */
+}
+
+/* Botones de acción rápidos */
+.btn-action-task {
+    border-radius: 8px;
+    transition: background 0.2s;
+    color: #6c757d;
+}
+
+.btn-action-task:hover {
+    background: #f8f9fa;
+}
+
+/* --- ESTILO DE PAGINADO --- */
+.pagination-container {
+    background: #ffffff;
+    padding: 8px 15px;
+    border-radius: 50px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    display: inline-flex !important;
+    align-items: center;
+}
+
+.btn-page {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50% !important;
+    border: none;
+    background: transparent;
+    color: var(--accent-color);
+    transition: all 0.2s;
+}
+
+.btn-page:hover:not(:disabled) {
+    background: var(--accent-color);
+    color: white;
+}
+
+.btn-page:disabled {
+    color: #dee2e6;
+    cursor: not-allowed;
+}
+
+.page-info {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #4b5563;
+    margin: 0 15px;
 }

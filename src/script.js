@@ -219,31 +219,45 @@ function processList(type, list, container) {
     if (s.page > totalPages) s.page = totalPages;
     const paginated = processedList.slice((s.page - 1) * s.limit, s.page * s.limit);
 
-   container.innerHTML = paginated.map(t => `
-        <div class="card task-card mb-2 border-start border-4 border-${getPriorityColor(t.priority)} ${t.isCompleted ? 'bg-light' : 'bg-white shadow-sm'}">
-            <div class="card-body p-3 d-flex align-items-center">
-                <input type="checkbox" class="form-check-input me-3" 
-                    onchange="toggleBulk('${type}', '${t.id}', this.checked)" 
-                    ${bulkSelection.type === type && bulkSelection.ids.has(t.id) ? 'checked' : ''}>
-                <div class="flex-grow-1" onclick="openEdit('${t.id}')" style="cursor:pointer">
-                    <div class="${t.isCompleted ? 'text-decoration-line-through text-muted' : 'fw-bold'}">${t.name}</div>
-                    <small class="text-muted"><i class="bi bi-clock"></i> ${t.dt.toLocaleString()}</small>
+  container.innerHTML = paginated.map(t => `
+    <div class="card task-card shadow-sm position-relative overflow-hidden">
+        <div class="position-absolute top-0 start-0 h-100 border-indicator bg-${getPriorityColor(t.priority)}"></div>
+        <div class="card-body p-3 d-flex align-items-center">
+            <input type="checkbox" class="form-check-input task-check-input me-3" 
+                onchange="toggleBulk('${type}', '${t.id}', this.checked)" 
+                ${bulkSelection.type === type && bulkSelection.ids.has(t.id) ? 'checked' : ''}>
+            
+            <div class="flex-grow-1" onclick="openEdit('${t.id}')" style="cursor:pointer">
+                <div class="mb-0 ${t.isCompleted ? 'text-decoration-line-through text-muted' : 'fw-bold text-dark'}">
+                    ${t.name}
                 </div>
-                <div class="d-flex gap-1">
-                    ${!t.isCompleted ? `
-                        <button class="btn btn-sm btn-outline-success border-0" onclick="quickAction('${t.id}', 'complete')" title="Completar">
-                            <i class="bi bi-check-circle"></i>
-                        </button>
-                    ` : `
-                        <button class="btn btn-sm btn-outline-warning border-0" onclick="quickAction('${t.id}', 'uncomplete')" title="Desmarcar">
-                            <i class="bi bi-arrow-counterclockwise"></i>
-                        </button>
-                    `}
-                    <button class="btn btn-sm text-danger border-0" onclick="deleteTask('${t.id}')"><i class="bi bi-trash"></i></button>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <span class="badge bg-light text-secondary border fw-normal" style="font-size: 0.7rem">
+                        <i class="bi bi-calendar3 me-1"></i> ${t.dt.toLocaleDateString()}
+                    </span>
+                    <span class="badge bg-light text-secondary border fw-normal" style="font-size: 0.7rem">
+                        <i class="bi bi-clock me-1"></i> ${t.dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </span>
                 </div>
             </div>
+
+            <div class="d-flex">
+                ${!t.isCompleted ? `
+                    <button class="btn btn-action-task" onclick="quickAction('${t.id}', 'complete')" title="Completar">
+                        <i class="bi bi-check2-circle fs-5 text-success"></i>
+                    </button>
+                ` : `
+                    <button class="btn btn-action-task" onclick="quickAction('${t.id}', 'uncomplete')" title="Desmarcar">
+                        <i class="bi bi-arrow-counterclockwise fs-5 text-warning"></i>
+                    </button>
+                `}
+                <button class="btn btn-action-task" onclick="deleteTask('${t.id}')">
+                    <i class="bi bi-trash3 fs-5 text-danger"></i>
+                </button>
+            </div>
         </div>
-    `).join('') || '<p class="text-center text-muted py-3">No hay tareas</p>';
+    </div>
+`).join('') || '<div class="text-center p-4 text-muted"><i class="bi bi-inbox fs-1 d-block mb-2"></i>No hay tareas</div>';
 
     renderPagination(type, processedList.length, s.limit, s.page);
 }
@@ -352,10 +366,14 @@ function updateBulkBarUI() {
         btnComplete.disabled = false;
         btnUncomplete.disabled = false;
         btnDelete.disabled = false;
+
+        els.bulkBar.style.display = 'flex';
+        els.bulkBar.classList.add('animate__animated', 'animate__slideInUp');
     } else {
         els.bulkBar.style.display = 'none';
         bulkSelection.type = null;
     }
+    
 }
 
 window.processBulkAction = async (action) => {
@@ -655,7 +673,22 @@ document.getElementById('profileSettingsForm').onsubmit = async (e) => {
 function renderPagination(type, totalItems, limit, currentPage) {
     const totalPages = Math.ceil(totalItems / limit) || 1;
     const container = document.getElementById(`${type}-pagination-container`);
-    container.innerHTML = `<button class="btn btn-sm btn-light me-2" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage('${type}', ${currentPage - 1})">Ant.</button><span class="small align-self-center">Pág ${currentPage}/${totalPages}</span><button class="btn btn-sm btn-light ms-2" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage('${type}', ${currentPage + 1})">Sig.</button>`;
+    
+    container.innerHTML = `
+        <div class="pagination-container">
+            <button class="btn-page" ${currentPage === 1 ? 'disabled' : ''} 
+                onclick="changePage('${type}', ${currentPage - 1})">
+                <i class="bi bi-chevron-left"></i>
+            </button>
+            <span class="page-info">
+                ${currentPage} <span class="text-muted">/</span> ${totalPages}
+            </span>
+            <button class="btn-page" ${currentPage === totalPages ? 'disabled' : ''} 
+                onclick="changePage('${type}', ${currentPage + 1})">
+                <i class="bi bi-chevron-right"></i>
+            </button>
+        </div>
+    `;
 }
 
 window.changePage = (type, page) => { state[type].page = page; renderAll(); };
