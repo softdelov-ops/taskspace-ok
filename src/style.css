@@ -178,3 +178,13 @@ body {
     padding-top: 0.5rem !important;
     padding-bottom: 0.5rem !important;
 }
+
+/* Ocultar elementos de autenticación por defecto */
+.d-none-auth {
+    display: none !important;
+}
+
+/* Asegurar que el main esté oculto inicialmente */
+#task-section {
+    display: none;
+}

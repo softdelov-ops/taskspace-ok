@@ -195,12 +195,39 @@ auth.onAuthStateChanged((user) => {
   updateUIAuth();
 });
 
-const updateUIAuth = () => {
+/* const updateUIAuth = () => {
   const isAuth = !!firebaseUser;
   els.loginBtn.classList.toggle("d-none", isAuth);
   els.userProfileArea.classList.toggle("d-none-auth", !isAuth);
   els.notificationsArea.classList.toggle("d-none-auth", !isAuth);
   els.taskSection.style.display = isAuth ? "block" : "none";
+};*/
+
+
+const updateUIAuth = () => {
+  const isAuth = !!firebaseUser;
+
+  // 1. Manejo del botón de Login (Solo visible si NO está autenticado)
+  els.loginBtn.classList.toggle("d-none", isAuth);
+
+  // 2. Manejo de áreas privadas (Perfil y Notificaciones)
+  // Agregamos o quitamos la clase d-none-auth según el estado
+  els.userProfileArea.classList.toggle("d-none-auth", !isAuth);
+  els.notificationsArea.classList.toggle("d-none-auth", !isAuth);
+
+  // 3. Manejo de la sección principal de tareas
+  els.taskSection.style.display = isAuth ? "block" : "none";
+
+  // 4. Limpieza de seguridad: Si no hay usuario, vaciamos el DOM de tareas
+  if (!isAuth) {
+    els.pendingTasks.innerHTML = "";
+    els.completedTasks.innerHTML = "";
+    els.notifCount.style.display = "none";
+    els.notifList.innerHTML = "";
+    // Ocultar barra de acciones masivas por si quedó abierta
+    els.bulkBar.style.display = "none";
+    bulkSelection.ids.clear();
+  }
 };
 
 // ******************************************************
@@ -271,6 +298,7 @@ function processList(type, list, container) {
           ? new Date(t.createdAt).toLocaleString([], {
               day: "2-digit",
               month: "2-digit",
+              year: "numeric",
               hour: "2-digit",
               minute: "2-digit",
             })
@@ -278,6 +306,7 @@ function processList(type, list, container) {
         const dueDate = t.dt.toLocaleString([], {
           day: "2-digit",
           month: "2-digit",
+          year: "numeric",
           hour: "2-digit",
           minute: "2-digit",
         });
@@ -308,14 +337,14 @@ function processList(type, list, container) {
                 </div>
                 <div class="d-flex flex-wrap gap-x-3 gap-y-1 mt-1 text-muted" style="font-size: 0.72rem;">
                     <span class="d-flex align-items-center me-2">
-                        <i class="bi bi-plus-circle me-1"></i><b class="me-1">C:</b> ${createdDate}
+                        <i class="bi bi-plus-circle me-1"></i><b class="me-1">Cda:</b> ${createdDate}
                     </span>
                     <span class="d-flex align-items-center ${
                       !t.isCompleted && t.dateTime < Date.now()
                         ? "text-danger fw-bold"
                         : ""
                     }">
-                        <i class="bi bi-alarm me-1"></i><b class="me-1">V:</b> ${dueDate}
+                        <i class="bi bi-alarm me-1"></i><b class="me-1">Vto:</b> ${dueDate}
                     </span>
                 </div>
             </div>
