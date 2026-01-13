@@ -12,11 +12,35 @@ const firebaseConfig = {
 };
 
 firebase.initializeApp(firebaseConfig);
+
 const auth = firebase.auth();
 
 const DB_TYPE = "realtime";
 const dbRT = firebase.database();
 const dbFS = firebase.firestore();
+
+/*dbFS.enablePersistence()
+  .catch((err) => {
+      if (err.code == 'failed-precondition') {
+          console.log("Persistencia falló: múltiples pestañas abiertas.");
+      } else if (err.code == 'unimplemented') {
+          console.log("El navegador no soporta persistencia.");
+      }
+  });
+*/
+//dbRT.enablePersistence(); // Para versiones recientes
+// O simplemente asegurar que los datos se mantengan sincronizados:
+//dbRT.ref(`users/${firebaseUser.uid}`).keepSynced(true);
+//dbRT.ref().keepSynced(true);
+
+const infoConexion = dbRT.ref(".info/connected");
+infoConexion.on("value", (snap) => {
+    if (snap.val() === true) {
+        console.log("Realtime DB: Conectado al servidor");
+    } else {
+        console.log("Realtime DB: Modo local (esperando conexión)");
+    }
+});
 
 // ******************************************************
 // 2. CAPA DE REPOSITORIO
@@ -560,18 +584,30 @@ document.getElementById("add-task-btn").onclick = () => {
 els.taskForm.onsubmit = async (e) => {
   e.preventDefault();
   const id = document.getElementById("taskID").value;
+  const nameValue = els.taskName.value.trim();
   const dtValue = document.getElementById("taskDateTime").value;
   const dt = new Date(dtValue).getTime();
+  const errorDiv = document.getElementById("duplicate-error");
+  
+  // 1. Validación de Duplicados (se mantiene igual)
+  const isDuplicate = tasks.some(t => 
+    t.name.toLowerCase() === nameValue.toLowerCase() && t.id !== id
+  );
 
-  // Permite fechas iguales a la actual (Date.now()), pero no menores
-  // Se resta un minuto (60000ms) para dar margen de tiempo al usuario mientras llena el formulario
-  if (dt < Date.now() - 60000 && !id) {
-    alert("⚠️ La fecha de vencimiento debe ser hoy o una fecha futura.");
+  if (isDuplicate) {
+    //if(errorDiv) errorDiv.style.display = "block";
+    if (errorDiv) {
+            errorDiv.style.display = "block";
+    }
+    //errorDiv.style.setProperty("display", "block", "important");
+    els.taskName.classList.add("is-invalid");
+    els.taskName.focus();
     return;
   }
 
+  // 2. Preparar los datos
   const data = {
-    name: els.taskName.value,
+    name: nameValue,
     priority: document.getElementById("taskPriority").value,
     notes: document.getElementById("taskNotes").value,
     dateTime: dt,
@@ -580,10 +616,20 @@ els.taskForm.onsubmit = async (e) => {
       ? tasks.find((t) => t.id === id)?.createdAt || Date.now()
       : Date.now(),
   };
-
-  await repo.saveTask(firebaseUser.uid, id, data);
-  bootstrap.Modal.getInstance(els.taskModal).hide();
+  
+  // 3. Cerrar el modal y resetear el formulario PRIMERO
+  const modalInstance = bootstrap.Modal.getInstance(els.taskModal);
+  if (modalInstance) modalInstance.hide();
+  if (errorDiv) errorDiv.style.display = "none";
   els.taskForm.reset();
+
+  // 4. Ejecutar el guardado (Firebase gestionará la cola offline en segundo plano)
+  try {
+    await repo.saveTask(firebaseUser.uid, id, data);
+    console.log("Operación enviada (se sincronizará si estás offline)");
+  } catch (error) {
+    console.error("Error al guardar:", error);
+  }
 };
 
 window.openEdit = (id) => {
@@ -905,3 +951,36 @@ document.getElementById("selectAllPending").onchange = (e) =>
   toggleSelectAll("pending", e.target.checked);
 document.getElementById("selectAllCompleted").onchange = (e) =>
   toggleSelectAll("completed", e.target.checked);
+
+
+// ******************************************************
+// 9. CONFIGURACIÓN sin conexión (Offline)
+// ******************************************************
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then(() => console.log("Service Worker registrado"))
+    .catch(err => console.log("Error al registrar SW", err));
+}
+
+window.addEventListener('online', () => {
+    const status = document.getElementById('online-status');
+    status.className = "badge rounded-pill bg-success ms-2";
+    status.innerHTML = '<i class="bi bi-cloud-check"></i> En línea';
+    // Firebase sincronizará automáticamente aquí
+});
+
+window.addEventListener('offline', () => {
+    const status = document.getElementById('online-status');
+    status.className = "badge rounded-pill bg-warning text-dark ms-2";
+    status.innerHTML = '<i class="bi bi-cloud-slash"></i> Modo Offline';
+});
+
+// Detecta cuando el usuario escribe en el campo de nombre
+els.taskName.addEventListener('input', () => {
+    const errorDiv = document.getElementById("duplicate-error");
+    if (errorDiv) {
+        errorDiv.style.display = "none"; // Oculta el mensaje
+    }
+    els.taskName.classList.remove("is-invalid"); // Quita el borde rojo
+});

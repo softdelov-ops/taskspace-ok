@@ -17,6 +17,7 @@
       href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css"
     />
     <link rel="stylesheet" href="/src/style.css" />
+    
   </head>
   <body>
     <nav
@@ -108,6 +109,11 @@
             <i class="bi bi-google me-2"></i> Iniciar sesión
           </button>
         </div>
+
+        <span id="online-status" class="badge rounded-pill bg-success ms-2">
+            <i class="bi bi-cloud-check"></i> En línea
+        </span>
+        
       </div>
     </nav>
 
@@ -296,17 +302,12 @@
           <div class="modal-body p-4">
             <input type="hidden" id="taskID" />
             <div class="mb-3">
-              <label class="form-label text-secondary small fw-bold"
-                >TÍTULO DE LA TAREA</label
-              >
-              <input
-                type="text"
-                class="form-control form-control-lg bg-light border-0"
-                id="taskName"
-                required
-                maxlength="100"
-                placeholder="¿Qué hay que hacer?"
-              />
+                <label class="form-label text-secondary small fw-bold">TÍTULO DE LA TAREA</label>
+                <input type="text" class="form-control form-control-lg bg-light border-0" id="taskName" required maxlength="100" placeholder="¿Qué hay que hacer?" />
+                
+                <div id="duplicate-error" class="text-danger small mt-1" style="display: none;">
+                    <i class="bi bi-exclamation-circle"></i> Ya existe una tarea con este nombre.
+                </div>
             </div>
             <div class="row g-3">
               <div class="col-md-7">
