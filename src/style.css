@@ -185,6 +185,9 @@ body {
 }
 
 /* Asegurar que el main esté oculto inicialmente */
-#task-section {
-    display: none;
+/* Ocultar elementos de autenticación y estado por defecto */
+.d-none-auth, 
+.online-status,
+.task-section {
+    display: none !important;
 }

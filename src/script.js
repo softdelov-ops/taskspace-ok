@@ -219,17 +219,12 @@ auth.onAuthStateChanged((user) => {
   updateUIAuth();
 });
 
-/* const updateUIAuth = () => {
-  const isAuth = !!firebaseUser;
-  els.loginBtn.classList.toggle("d-none", isAuth);
-  els.userProfileArea.classList.toggle("d-none-auth", !isAuth);
-  els.notificationsArea.classList.toggle("d-none-auth", !isAuth);
-  els.taskSection.style.display = isAuth ? "block" : "none";
-};*/
+
 
 
 const updateUIAuth = () => {
   const isAuth = !!firebaseUser;
+  const statusBadge = document.getElementById('online-status');
 
   // 1. Manejo del botón de Login (Solo visible si NO está autenticado)
   els.loginBtn.classList.toggle("d-none", isAuth);
@@ -252,6 +247,30 @@ const updateUIAuth = () => {
     els.bulkBar.style.display = "none";
     bulkSelection.ids.clear();
   }
+
+  if (statusBadge) {
+        if (isAuth) {
+            // Si está logueado, lo mostramos y evaluamos el estado actual
+            statusBadge.classList.remove("d-none");
+            actualizarTextoEstado(navigator.onLine); 
+        } else {
+            // Si no está logueado, lo ocultamos por completo
+            statusBadge.classList.add("d-none");
+        }
+    }
+};
+
+const actualizarTextoEstado = (isOnline) => {
+    const status = document.getElementById('online-status');
+    if (!status || !firebaseUser) return; // No hacer nada si no hay usuario
+
+    if (isOnline) {
+        status.className = "badge rounded-pill bg-success ms-2";
+        status.innerHTML = '<i class="bi bi-cloud-check"></i> En línea';
+    } else {
+        status.className = "badge rounded-pill bg-warning text-dark ms-2";
+        status.innerHTML = '<i class="bi bi-cloud-slash"></i> Modo Offline';
+    }
 };
 
 // ******************************************************
@@ -984,3 +1003,6 @@ els.taskName.addEventListener('input', () => {
     }
     els.taskName.classList.remove("is-invalid"); // Quita el borde rojo
 });
+
+window.addEventListener('online', () => actualizarTextoEstado(true));
+window.addEventListener('offline', () => actualizarTextoEstado(false));
