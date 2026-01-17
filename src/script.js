@@ -354,67 +354,47 @@ function processList(type, list, container) {
           minute: "2-digit",
         });
 
+        // Formato para fecha de finalización
+        const completedDate = t.completedAt ? new Date(t.completedAt).toLocaleString([], { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : "--";
+
         return `
     <div class="card task-card shadow-sm position-relative overflow-hidden">
-        <div class="position-absolute top-0 start-0 h-100 border-indicator bg-${getPriorityColor(
-          t.priority
-        )}"></div>
-        <div class="card-body p-2 d-flex align-items-center">
-            <input type="checkbox" class="form-check-input task-check-input ms-1 me-3" 
-                onchange="toggleBulk('${type}', '${t.id}', this.checked)" 
-                ${
-                  bulkSelection.type === type && bulkSelection.ids.has(t.id)
-                    ? "checked"
-                    : ""
-                }>
-            
-            <div class="flex-grow-1" onclick="openEdit('${
-              t.id
-            }')" style="cursor:pointer; min-width: 0;">
-                <div class="mb-0 text-truncate ${
-                  t.isCompleted
-                    ? "text-decoration-line-through text-muted"
-                    : "fw-bold text-dark"
-                }" style="font-size: 0.95rem;">
-                    ${t.name}
-                </div>
-                <div class="d-flex flex-wrap gap-x-3 gap-y-1 mt-1 text-muted" style="font-size: 0.72rem;">
-                    <span class="d-flex align-items-center me-2">
-                        <i class="bi bi-plus-circle me-1"></i><b class="me-1">Cda:</b> ${createdDate}
-                    </span>
-                    <span class="d-flex align-items-center ${
-                      !t.isCompleted && t.dateTime < Date.now()
-                        ? "text-danger fw-bold"
-                        : ""
-                    }">
-                        <i class="bi bi-alarm me-1"></i><b class="me-1">Vto:</b> ${dueDate}
-                    </span>
-                </div>
+    <div class="position-absolute top-0 start-0 h-100 border-indicator bg-${getPriorityColor(t.priority)}"></div>
+    <div class="card-body p-2 d-flex align-items-center">
+        <input type="checkbox" class="form-check-input task-check-input ms-1 me-3" 
+            onchange="toggleBulk('${type}', '${t.id}', this.checked)" 
+            ${bulkSelection.type === type && bulkSelection.ids.has(t.id) ? "checked" : ""}>
+        
+        <div class="flex-grow-1" onclick="openEdit('${t.id}')" style="cursor:pointer; min-width: 0;">
+            <div class="mb-0 text-truncate ${t.isCompleted ? "text-decoration-line-through text-muted" : "fw-bold text-dark"}" style="font-size: 0.9rem;">
+                ${t.name}
             </div>
-
-            <div class="d-flex gap-0">
-                ${
-                  !t.isCompleted
-                    ? `
-                    <button class="btn btn-action-task p-1" onclick="quickAction('${t.id}', 'complete')" title="Completar">
-                        <i class="bi bi-check2-circle fs-5 text-success"></i>
-                    </button>
-                `
-                    : `
-                    <button class="btn btn-action-task p-1" onclick="quickAction('${t.id}', 'uncomplete')" title="Desmarcar">
-                        <i class="bi bi-arrow-counterclockwise fs-5 text-warning"></i>
-                    </button>
-                `
-                }
-                <button class="btn btn-action-task p-1" onclick="deleteTask('${
-                  t.id
-                }')">
-                    <i class="bi bi-trash3 fs-5 text-danger"></i>
-                </button>
+            <div class="d-flex flex-wrap gap-x-2 text-muted single-line-meta" style="font-size: 0.68rem; white-space: nowrap;">
+                <span class="d-flex align-items-center">
+                    <i class="bi bi-plus-circle me-1"></i><b>Cda:</b>&nbsp;${createdDate}
+                </span>
+                <span class="d-flex align-items-center ${!t.isCompleted && t.dateTime < Date.now() ? "text-danger fw-bold" : ""}">
+                    <i class="bi bi-alarm me-1"></i><b>Vto:</b>&nbsp;${dueDate}
+                </span>
+                ${t.isCompleted ? `
+                <span class="d-flex align-items-center text-success fw-semibold">
+                    <i class="bi bi-check-all fs-6 me-1"></i><b>Fda:</b>&nbsp;${completedDate}
+                </span>` : ""}
             </div>
         </div>
-    </div>`;
-      })
+
+        <div class="d-flex gap-0">
+            ${!t.isCompleted 
+                ? `<button class="btn btn-action-task p-1" onclick="quickAction('${t.id}', 'complete')"><i class="bi bi-check2-circle fs-5 text-success"></i></button>`
+                : `<button class="btn btn-action-task p-1" onclick="quickAction('${t.id}', 'uncomplete')"><i class="bi bi-arrow-counterclockwise fs-5 text-warning"></i></button>`
+            }
+            <button class="btn btn-action-task p-1" onclick="deleteTask('${t.id}')">
+                <i class="bi bi-trash3 fs-5 text-danger"></i>
+            </button>
+        </div>
+    </div>
+</div>`;     
+ })
       .join("") ||
     '<div class="text-center p-4 text-muted">No hay tareas</div>';
 

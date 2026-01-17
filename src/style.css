@@ -191,3 +191,34 @@ body {
 .task-section {
     display: none !important;
 }
+
+/* Asegura que los metadatos no salten de línea si hay espacio suficiente */
+.single-line-meta {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Reducimos un poco más el espacio entre elementos de fecha */
+.gap-x-2 {
+    column-gap: 0.5rem !important;
+}
+
+/* Estilo específico para el icono de doble check */
+.bi-check-all {
+    font-size: 1rem !important; /* Un poquito más grande para que se note el doble check */
+    line-height: 1;
+}
+
+/* Ajuste fino para móviles: si la pantalla es muy chica, permite scroll horizontal suave */
+@media (max-width: 480px) {
+    .single-line-meta {
+        overflow-x: auto;
+        padding-bottom: 2px;
+    }
+    .single-line-meta::-webkit-scrollbar {
+        display: none; /* Oculta la barra de scroll */
+    }
+}
