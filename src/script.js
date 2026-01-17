@@ -217,8 +217,70 @@ auth.onAuthStateChanged((user) => {
     listenToTasks();
   }
   updateUIAuth();
-});
+});const updateProfileUI = (user) => {
+    const photoEl = document.getElementById("user-photo");
+    const nameEl = document.getElementById("user-display-name");
+    const profileArea = document.getElementById("user-profile-area"); // El contenedor en el navbar
 
+    if (!nameEl || !photoEl) return;
+
+    nameEl.textContent = user.displayName || "Usuario";
+
+    // Lógica de decisión: ¿Foto o Iniciales?
+    if (user.photoURL && user.photoURL !== "" && !user.photoURL.includes("placeholder")) {
+        // MOSTRAR FOTO
+        photoEl.src = user.photoURL;
+        photoEl.style.display = "block";
+        
+        // Quitar iniciales si existían de antes
+        const existingInitials = profileArea.querySelector(".user-initials-avatar");
+        if (existingInitials) existingInitials.remove();
+    } else {
+        // MOSTRAR INICIALES
+        photoEl.style.display = "none";
+        photoEl.src = "";
+
+        // Si no existe el div de iniciales, lo creamos
+        let initialsDiv = profileArea.querySelector(".user-initials-avatar");
+        if (!initialsDiv) {
+            initialsDiv = document.createElement("div");
+            initialsDiv.className = "user-initials-avatar";
+            // Lo insertamos antes de la imagen oculta
+            photoEl.parentNode.insertBefore(initialsDiv, photoEl);
+        }
+        initialsDiv.textContent = getInitials(user.displayName || "U");
+    }
+};
+
+/*const updateProfileUI = (user) => {
+    const photoEl = document.getElementById("user-photo");
+    const nameEl = document.getElementById("user-display-name");
+    const profileArea = document.getElementById("user-profile-area");
+
+    nameEl.textContent = user.displayName;
+
+    // Si tiene foto, la mostramos. Si no, creamos/mostramos las iniciales.
+    if (user.photoURL) {
+        photoEl.src = user.photoURL;
+        photoEl.style.display = "block";
+        // Si tenías un div de iniciales previo, ocúltalo
+        const existingInitials = profileArea.querySelector(".user-initials-avatar");
+        if (existingInitials) existingInitials.remove();
+    } else {
+        photoEl.style.display = "none";
+        // Crear el avatar de iniciales si no existe
+        let initialsDiv = profileArea.querySelector(".user-initials-avatar");
+        if (!initialsDiv) {
+            initialsDiv = document.createElement("div");
+            initialsDiv.className = "user-initials-avatar";
+            // Insertar antes del nombre o donde prefieras en el botón
+            photoEl.parentNode.insertBefore(initialsDiv, photoEl);
+        }
+        initialsDiv.textContent = getInitials(user.displayName);
+    }
+};
+*/
+// script.js
 
 
 
@@ -799,45 +861,42 @@ document.getElementById("emailSummaryEnabled").onchange = (e) =>
     ? "block"
     : "none");
 
+// script.js
+
 async function loadUserSettings() {
-  // 1. Intentamos traer los datos de la base de datos
-  const data = await repo.getUserData(firebaseUser.uid);
-  const profile = data?.profile;
+    const data = await repo.getUserData(firebaseUser.uid);
+    const profile = data?.profile;
 
-  // 2. Referencias a los elementos de la interfaz (Navbar)
-  const navName = document.getElementById("user-display-name");
-  const navPhoto = document.getElementById("user-photo");
+    if (profile) {
+        // 1. Actualiza el Navbar (esto ya lo tenías)
+        updateProfileUI(profile);
 
-  // 3. Si hay datos en la DB, los ponemos en el INICIO (Navbar)
-  if (profile) {
-    // Actualiza el Inicio (Navbar)
-    if (profile.displayName)
-      document.getElementById("user-display-name").textContent =
-        profile.displayName;
-    if (profile.photoURL)
-      document.getElementById("user-photo").src = profile.photoURL;
+        // 2. Rellenar campos del modal
+        document.getElementById("profileDisplayName").value = profile.displayName || "";
+        document.getElementById("profileEmail").value = profile.email || "";
 
-    // Rellena el Modal
-    document.getElementById("profileDisplayName").value = profile.displayName;
-    document.getElementById("profileEmail").value = profile.email;
-    document.getElementById("profilePreview").src = profile.photoURL;
-  }
-
-  // 4. También rellenamos los campos del MODAL para que coincidan
-  const modalNameInput = document.getElementById("profileDisplayName");
-  const modalEmailInput = document.getElementById("profileEmail");
-  const modalPreview = document.getElementById("profilePreview");
-
-  if (modalNameInput)
-    modalNameInput.value =
-      profile?.displayName || firebaseUser.displayName || "";
-  if (modalEmailInput)
-    modalEmailInput.value = profile?.email || firebaseUser.email || "";
-  if (modalPreview)
-    modalPreview.src =
-      profile?.photoURL ||
-      firebaseUser.photoURL ||
-      "https://via.placeholder.com/80";
+        // 3. Lógica para las iniciales EN EL MODAL
+        const modalPreview = document.getElementById("profilePreview");
+        const modalContainer = document.getElementById("modal-avatar-container");
+        
+        if (profile.photoURL && profile.photoURL !== "") {
+            modalPreview.src = profile.photoURL;
+            modalPreview.style.display = "block";
+            const existingInitials = modalContainer.querySelector(".user-initials-avatar-modal");
+            if (existingInitials) existingInitials.remove();
+        } else {
+            modalPreview.style.display = "none";
+            
+            // Crear iniciales grandes para el modal
+            let initialsDiv = modalContainer.querySelector(".user-initials-avatar-modal");
+            if (!initialsDiv) {
+                initialsDiv = document.createElement("div");
+                initialsDiv.className = "user-initials-avatar-modal";
+                modalContainer.appendChild(initialsDiv);
+            }
+            initialsDiv.textContent = getInitials(profile.displayName || firebaseUser.displayName);
+        }
+    }
 }
 
 // Mostrar la imagen en el modal en cuanto se selecciona el archivo
@@ -867,56 +926,36 @@ document.getElementById("profileFile").addEventListener("change", function (e) {
 });
 
 document.getElementById("profileSettingsForm").onsubmit = async (e) => {
-  e.preventDefault();
-  const statusText = document.getElementById("uploadStatus");
-  const newName = document.getElementById("profileDisplayName").value;
-  const newEmail = document.getElementById("profileEmail").value;
-  const photoURL = document.getElementById("profilePreview").src; // La imagen ya comprimida
+    e.preventDefault();
+    const newName = document.getElementById("profileDisplayName").value;
+    const newEmail = document.getElementById("profileEmail").value;
+    const modalPreview = document.getElementById("profilePreview");
 
-  statusText.classList.remove("d-none");
+    // Determinamos si el usuario dejó una foto o la quitó (viendo si es el placeholder)
+    const currentPhotoURL = (modalPreview.src.includes("placeholder") || !modalPreview.src) ? "" : modalPreview.src;
 
-  try {
-    // 1. Guardar en la Base de Datos
-    await repo.saveProfile(firebaseUser.uid, {
-      displayName: newName,
-      photoURL: photoURL,
-      email: newEmail,
-    });
+    try {
+        // Guardar cambios en la DB
+        await repo.saveProfile(firebaseUser.uid, {
+            displayName: newName,
+            photoURL: currentPhotoURL,
+            email: newEmail,
+        });
 
-    // 2. ACTUALIZAR AREA DE INICIO (Navbar)
-    if (document.getElementById("user-display-name")) {
-      document.getElementById("user-display-name").textContent = newName;
+        // Actualizar la interfaz global
+        updateProfileUI({
+            displayName: newName,
+            photoURL: currentPhotoURL
+        });
+
+        // Cerrar modal
+        const modalInstance = bootstrap.Modal.getInstance(document.getElementById("profileSettingsModal"));
+        if (modalInstance) modalInstance.hide();
+
+        alert("¡Perfil actualizado!");
+    } catch (error) {
+        console.error("Error al guardar:", error);
     }
-    if (document.getElementById("user-photo")) {
-      document.getElementById("user-photo").src = photoURL;
-    }
-    if (document.getElementById("user-email")) {
-      document.getElementById("user-email").textContent = newEmail;
-    }
-
-    // 3. Guardar otros ajustes (si los tienes)
-    userSettings = {
-      bellEnabled: document.getElementById("bellEnabled").checked,
-      bellValue: parseInt(document.getElementById("bellValue").value),
-      bellUnit: document.getElementById("bellUnit").value,
-      emailSummaryEnabled: document.getElementById("emailSummaryEnabled")
-        .checked,
-      emailSummaryUnit: document.getElementById("emailSummaryUnit").value,
-    };
-    await repo.saveSettings(firebaseUser.uid, userSettings);
-
-    // 4. CERRAR MODAL
-    const modalEl = document.getElementById("profileSettingsModal");
-    const modalInstance = bootstrap.Modal.getInstance(modalEl);
-    if (modalInstance) modalInstance.hide();
-
-    alert("¡Perfil actualizado en todas las áreas!");
-  } catch (error) {
-    console.error("Error:", error);
-    alert("Error al guardar. Intenta con otra imagen.");
-  } finally {
-    statusText.classList.add("d-none");
-  }
 };
 
 function renderPagination(type, totalItems, limit, currentPage) {
@@ -970,6 +1009,113 @@ document.getElementById("selectAllPending").onchange = (e) =>
 document.getElementById("selectAllCompleted").onchange = (e) =>
   toggleSelectAll("completed", e.target.checked);
 
+document.getElementById("remove-photo-btn").addEventListener("click", async () => {
+    if (!firebaseUser) return;
+
+    if (confirm("¿Quieres quitar tu foto y usar tus iniciales?")) {
+        try {
+            // 1. Guardar en la base de datos (Persistencia)
+            await repo.saveProfile(firebaseUser.uid, { 
+                photoURL: "" 
+            });
+
+            // 2. Limpiar el preview del modal
+            const modalPreview = document.getElementById("profilePreview");
+            if (modalPreview) modalPreview.src = "https://via.placeholder.com/80";
+
+            // 3. Actualizar el área de perfil (Navbar) inmediatamente
+            updateProfileUI({
+                displayName: document.getElementById("profileDisplayName").value || firebaseUser.displayName,
+                photoURL: ""
+            });
+
+            alert("Foto eliminada. Ahora verás tus iniciales.");
+        } catch (error) {
+            console.error("Error:", error);
+            alert("No se pudo eliminar la foto.");
+        }
+    }
+});
+
+function getInitials(name) {
+    if (!name) return "?";
+    return name
+        .split(' ')
+        .map(word => word[0])
+        .join('')
+        .toUpperCase()
+        .substring(0, 2);
+}
+
+
+// Función para gestionar la visualización instantánea en Modal y Navbar
+function refreshAvatarUI(photoURL, displayName) {
+    const navPhoto = document.getElementById("user-photo");
+    const modalPhoto = document.getElementById("profilePreview");
+    const modalInitials = document.getElementById("modal-initials");
+    const removeBtn = document.getElementById("remove-photo-btn");
+    const navArea = document.getElementById("user-profile-area");
+
+    const initials = getInitials(displayName || "U");
+
+    if (photoURL && photoURL !== "" && !photoURL.includes("placeholder")) {
+        // --- MODO FOTO ---
+        // Modal
+        modalPhoto.src = photoURL;
+        modalPhoto.style.display = "block"; // La imagen tapa las iniciales (z-index 2)
+        removeBtn.style.display = "inline-block";
+
+        // Navbar
+        navPhoto.src = photoURL;
+        navPhoto.style.display = "block";
+        const oldInitials = navArea.querySelector(".user-initials-avatar");
+        if (oldInitials) oldInitials.remove();
+    } else {
+        // --- MODO INICIALES ---
+        // Modal
+        modalPhoto.style.display = "none";
+        modalPhoto.src = "";
+        modalInitials.textContent = initials;
+        removeBtn.style.display = "none";
+
+        // Navbar
+        navPhoto.style.display = "none";
+        let navInitials = navArea.querySelector(".user-initials-avatar");
+        if (!navInitials) {
+            navInitials = document.createElement("div");
+            navInitials.className = "user-initials-avatar";
+            navPhoto.parentNode.insertBefore(navInitials, navPhoto);
+        }
+        navInitials.textContent = initials;
+    }
+}
+
+// Evento cuando eliges una foto nueva
+document.getElementById("profilePhotoInput").addEventListener("change", function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const tempUrl = event.target.result;
+            // Actualizar UI instantáneamente (sin guardar aún en DB)
+            refreshAvatarUI(tempUrl, document.getElementById("profileDisplayName").value);
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Evento Quitar Foto
+document.getElementById("remove-photo-btn").addEventListener("click", async () => {
+    if (confirm("¿Quitar foto?")) {
+        // Actualizar UI instantáneamente
+        refreshAvatarUI("", document.getElementById("profileDisplayName").value);
+        
+        // Guardar en Base de Datos de forma asíncrona (Background)
+        if (firebaseUser) {
+            await repo.saveProfile(firebaseUser.uid, { photoURL: "" });
+        }
+    }
+});
 
 // ******************************************************
 // 9. CONFIGURACIÓN sin conexión (Offline)

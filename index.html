@@ -445,14 +445,31 @@
         </h2>
         <div id="collapsePersonal" class="accordion-collapse collapse show" data-bs-parent="#accordionSettings">
             <div class="accordion-body">
-                <div class="text-center mb-4">
-                    <div class="position-relative d-inline-block">
-                        <img id="profilePreview" src="https://via.placeholder.com/100" class="rounded-circle border border-4 border-white shadow-sm" style="width: 100px; height: 100px; object-fit: cover;">
-                        <label for="profileFile" class="btn btn-sm btn-dark position-absolute bottom-0 end-0 rounded-circle">
-                            <i class="bi bi-camera"></i>
-                        </label>
+                  <div class="text-center mb-4">
+                      <div class="position-relative d-inline-block">
+                          <div id="modal-avatar-container" class="rounded-circle border shadow-sm overflow-hidden bg-light d-flex align-items-center justify-content-center" 
+                              style="width: 100px; height: 100px; position: relative;">
+                              
+                              <div id="modal-initials" class="fw-bold text-white w-100 h-100 d-flex align-items-center justify-content-center" 
+                                  style="font-size: 2.5rem; background: var(--primary-gradient); position: absolute; top: 0; left: 0; z-index: 1;">
+                              </div>
+
+                              <img id="profilePreview" src="" class="w-100 h-100" 
+                                  style="object-fit: cover; position: absolute; top: 0; left: 0; z-index: 2; display: none;" />
+
+                              <label for="profilePhotoInput" class="camera-overlay" 
+                                    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;">
+                                  <i class="bi bi-camera-fill text-white fs-3"></i>
+                                  <input type="file" id="profilePhotoInput" hidden accept="image/*">
+                              </label>
+                          </div>
+                      </div>
+                      
+                      <div class="mt-2" style="height: 25px;"> <button type="button" class="btn btn-link btn-sm text-danger text-decoration-none" id="remove-photo-btn" style="display: none;">
+                              <i class="bi bi-x-circle me-1"></i> Quitar foto
+                          </button>
+                      </div>
                     </div>
-                </div>
                 <div class="row g-3">
                     <div class="col-12">
                         <label class="form-label small fw-bold text-muted">Nombre Completo</label>

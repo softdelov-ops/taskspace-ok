@@ -222,3 +222,62 @@ body {
         display: none; /* Oculta la barra de scroll */
     }
 }
+
+/* Avatar de iniciales por defecto */
+
+.user-initials-avatar-modal {
+    width: 80px;
+    height: 80px;
+    background: var(--primary-gradient);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.8rem; /* Más grande para el modal */
+    text-transform: uppercase;
+    box-shadow: var(--shadow-soft);
+}
+
+.cur-pointer {
+    cursor: pointer;
+}
+
+/* Estilo para el overlay de la cámara */
+.camera-overlay {
+    background: rgba(0, 0, 0, 0); /* Transparente por defecto */
+}
+
+.camera-overlay i {
+    opacity: 0; /* Icono invisible */
+    transform: scale(0.8);
+    transition: all 0.3s ease;
+}
+
+/* Al pasar el ratón sobre el contenedor */
+#modal-avatar-container:hover .camera-overlay {
+    background: rgba(0, 0, 0, 0.4); /* Fondo oscuro suave */
+}
+
+#modal-avatar-container:hover .camera-overlay i {
+    opacity: 1; /* Icono visible */
+    transform: scale(1);
+}
+
+/* Iniciales del Navbar */
+.user-initials-avatar {
+    width: 35px;
+    height: 35px;
+    background: var(--primary-gradient);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.85rem;
+    margin-right: 10px;
+    text-transform: uppercase;
+    z-index: 10;
+}
