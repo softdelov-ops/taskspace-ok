@@ -295,8 +295,10 @@ function processList(type, list, container) {
   } else if (s.filterType === "priority" && s.filterValue) {
     processedList = processedList.filter((t) => t.priority === s.filterValue);
   } else if (s.filterType === "dateRange" && s.dateStart && s.dateEnd) {
-    const start = new Date(s.dateStart).getTime();
-    const end = new Date(s.dateEnd).getTime();
+    //const start = new Date(s.dateStart).getTime();
+    //const end = new Date(s.dateEnd).getTime();
+    const start = new Date(s.dateStart).setHours(0, 0, 0, 0); // Inicio del día
+    const end = new Date(s.dateEnd).setHours(23, 59, 59, 999); // Fin del día
     processedList = processedList.filter((t) => {
       const targetTime = type === "pending" ? t.dateTime : t.completedAt;
       return targetTime >= start && targetTime <= end;
@@ -415,13 +417,18 @@ const renderAll = () => {
   updateBulkBarUI();
 };
 
+
+
 function handleFilterChange(type, filterType) {
   const s = state[type];
   s.filterType = filterType;
   s.page = 1;
-  const container = document.getElementById(
-    `filterInputContainer${type === "pending" ? "Pending" : "Completed"}`
-  );
+  
+  // Seleccionamos el contenedor correcto según el tipo de lista
+  const containerId = type === "pending" ? "filterInputContainerPending" : "filterInputContainerCompleted";
+  const container = document.getElementById(containerId);
+  
+  if (!container) return;
   container.innerHTML = "";
 
   if (filterType === "name") {
@@ -437,21 +444,33 @@ function handleFilterChange(type, filterType) {
   } else if (filterType === "priority") {
     const select = document.createElement("select");
     select.className = "form-select form-select-sm";
-    select.innerHTML = `<option value="">Todas</option><option value="urgente">Urgente</option><option value="alta">Alta</option><option value="media">Media</option><option value="baja">Baja</option>`;
+    select.innerHTML = `<option value="">Todas</option>
+                        <option value="urgente">Urgente</option>
+                        <option value="alta">Alta</option>
+                        <option value="media">Media</option>
+                        <option value="baja">Baja</option>`;
     select.onchange = (e) => {
       s.filterValue = e.target.value;
       renderAll();
     };
     container.appendChild(select);
   } else if (filterType === "dateRange") {
-    container.innerHTML = `<input type="date" class="form-control form-control-sm" id="start-${type}"><input type="date" class="form-control form-control-sm" id="end-${type}">`;
+    // NUEVO: Genera dos inputs de fecha para el rango
+    container.innerHTML = `
+      <div class="d-flex gap-1">
+        <input type="date" class="form-control form-control-sm" id="start-${type}" title="Desde">
+        <input type="date" class="form-control form-control-sm" id="end-${type}" title="Hasta">
+      </div>`;
+    
     const dStart = document.getElementById(`start-${type}`);
     const dEnd = document.getElementById(`end-${type}`);
+    
     const updateDates = () => {
       s.dateStart = dStart.value;
       s.dateEnd = dEnd.value;
       if (s.dateStart && s.dateEnd) renderAll();
     };
+    
     dStart.onchange = updateDates;
     dEnd.onchange = updateDates;
   }
