@@ -16,6 +16,7 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 
 const DB_TYPE = "realtime";
+//const DB_TYPE = "firestore";
 const dbRT = firebase.database();
 const dbFS = firebase.firestore();
 
@@ -36,9 +37,21 @@ const dbFS = firebase.firestore();
 const infoConexion = dbRT.ref(".info/connected");
 infoConexion.on("value", (snap) => {
     if (snap.val() === true) {
-        console.log("Realtime DB: Conectado al servidor");
+          if (DB_TYPE === "realtime") {
+            console.log(DB_TYPE + " DB: Conectado al servidor");
+          }else if (DB_TYPE === "firestore") {
+            console.log(DB_TYPE + " DB: Conectado al servidor");
+          } else {
+            console.log(DB_TYPE + " DB: Conectado al servidor");
+          }
     } else {
-        console.log("Realtime DB: Modo local (esperando conexión)");
+         if (DB_TYPE === "realtime") {
+            console.log(DB_TYPE + " DB: Modo local (esperando conexión)");
+          }else if (DB_TYPE === "firestore") {
+            console.log(DB_TYPE + " DB: Modo local (esperando conexión)");
+          } else {
+            console.log(DB_TYPE + " DB: Modo local (esperando conexión)");
+          }
     }
 });
 
