@@ -19,21 +19,7 @@ const DB_TYPE = "realtime";
 //const DB_TYPE = "firestore";
 const dbRT = firebase.database();
 const dbFS = firebase.firestore();
-
-/*dbFS.enablePersistence()
-  .catch((err) => {
-      if (err.code == 'failed-precondition') {
-          console.log("Persistencia falló: múltiples pestañas abiertas.");
-      } else if (err.code == 'unimplemented') {
-          console.log("El navegador no soporta persistencia.");
-      }
-  });
-*/
-//dbRT.enablePersistence(); // Para versiones recientes
-// O simplemente asegurar que los datos se mantengan sincronizados:
-//dbRT.ref(`users/${firebaseUser.uid}`).keepSynced(true);
-//dbRT.ref().keepSynced(true);
-
+//
 const infoConexion = dbRT.ref(".info/connected");
 infoConexion.on("value", (snap) => {
     if (snap.val() === true) {
@@ -215,6 +201,7 @@ const els = {
   taskModal: document.getElementById("taskModal"),
   taskName: document.getElementById("taskName"),
   taskForm: document.getElementById("newTaskForm"),
+  profileSettingsForm: document.getElementById("profileSettingsForm"),
   pendingHeader: document.getElementById("pendingTasksHeader"),
   completedHeader: document.getElementById("completedTasksHeader"),
 };
@@ -244,6 +231,9 @@ auth.onAuthStateChanged((user) => {
         // MOSTRAR FOTO
         photoEl.src = user.photoURL;
         photoEl.style.display = "block";
+
+        const removeBtn = document.getElementById("remove-photo-btn");
+        removeBtn.style.display = "inline-block";
         
         // Quitar iniciales si existían de antes
         const existingInitials = profileArea.querySelector(".user-initials-avatar");
@@ -875,16 +865,75 @@ document.getElementById("emailSummaryEnabled").onchange = (e) =>
     : "none");
 
 // script.js
+els.profileSettingsForm.onsubmit = async (e) => {
+  e.preventDefault();
+  const type = document.getElementById("settingsListType").value;
+  state[type].sort = document.getElementById("defaultSort").value;
+  state[type].limit = parseInt(document.getElementById("itemsPerPage").value);
+  state[type].page = 1;
+  localStorage.setItem(`${type}_sort`, state[type].sort);
+  localStorage.setItem(`${type}_limit`, state[type].limit);
+
+  if (firebaseUser) {
+    await repo.saveSettings(firebaseUser.uid, {
+      bellEnabled: document.getElementById("bellEnabled").checked,
+      bellUnit: document.getElementById("bellUnit").value,
+      bellValue: document.getElementById("bellValue").value,
+      emailSummaryEnabled: document.getElementById("emailSummaryEnabled").checked,
+      emailSummaryUnit: document.getElementById("emailSummaryUnit").value,
+      updatedAt: firebase.database.ServerValue.TIMESTAMP
+    });
+  }
+  renderAll();
+  bootstrap.Modal.getInstance(document.getElementById("settingsModal")).hide();
+};
+
+document.getElementById("profileSettingsForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const type = document.getElementById("settingsListType").value;
+  state[type].sort = document.getElementById("defaultSort").value;
+  state[type].limit = parseInt(document.getElementById("itemsPerPage").value);
+  state[type].page = 1;
+  localStorage.setItem(`${type}_sort`, state[type].sort);
+  localStorage.setItem(`${type}_limit`, state[type].limit);
+
+  if (firebaseUser) {
+    try {
+      if (firebaseUser) {
+            const prefs = {
+                bellEnabled: document.getElementById("bellEnabled").checked,
+                bellUnit: document.getElementById("bellUnit").value,
+                bellValue: document.getElementById("bellValue").value,
+                emailSummaryEnabled: document.getElementById("emailSummaryEnabled").checked,
+                emailSummaryUnit: document.getElementById("emailSummaryUnit").value,
+                updatedAt: firebase.database.ServerValue.TIMESTAMP
+            };
+            await repo.saveSettings(firebaseUser.uid, prefs);
+            userSettings = { ...userSettings, ...prefs };
+            console.log("Preferencias de resumen actualizadas");
+          }
+    } catch (err) {
+      console.error("Error al guardar en DB:", err);
+    }
+  }
+  
+  renderAll();
+  updateAlerts();
+  bootstrap.Modal.getInstance(document.getElementById("settingsModal")).hide();
+};
+
 
 async function loadUserSettings() {
     const data = await repo.getUserData(firebaseUser.uid);
     const profile = data?.profile;
 
     if (profile) {
+
+      const settings = data?.settings;
         // 1. Actualiza el Navbar (esto ya lo tenías)
         updateProfileUI(profile);
 
-        // 2. Rellenar campos del modal
+        // 2. Rellenar campos Información Personal del modal
         document.getElementById("profileDisplayName").value = profile.displayName || "";
         document.getElementById("profileEmail").value = profile.email || "";
 
@@ -909,6 +958,13 @@ async function loadUserSettings() {
             }
             initialsDiv.textContent = getInitials(profile.displayName || firebaseUser.displayName);
         }
+        
+        // 4. Rellenar campos Alerta y Resumen del modal
+            document.getElementById("bellEnabled").checked = settings.prefs.bellEnabled || "";
+            document.getElementById("bellUnit").value = settings.prefs.bellUnit || "";
+            document.getElementById("bellValue").value = settings.prefs.bellValue || "";
+            document.getElementById("emailSummaryEnabled").checked = settings.prefs.emailSummaryEnabled || "";
+            document.getElementById("emailSummaryUnit").value = settings.prefs.emailSummaryUnit || "";
     }
 }
 
@@ -948,19 +1004,34 @@ document.getElementById("profileSettingsForm").onsubmit = async (e) => {
     const currentPhotoURL = (modalPreview.src.includes("placeholder") || !modalPreview.src) ? "" : modalPreview.src;
 
     try {
-        // Guardar cambios en la DB
+        // Guardar cambios Información Persoanl en la DB
         await repo.saveProfile(firebaseUser.uid, {
             displayName: newName,
-            photoURL: currentPhotoURL,
+            photoURL: currentPhostoURL,
             email: newEmail,
         });
+
+        // Guardar cambios Alerta y Resumen en la DB
+         if (firebaseUser) {
+            const prefs = {
+                bellEnabled: document.getElementById("bellEnabled").checked,
+                bellUnit: document.getElementById("bellUnit").value,
+                bellValue: document.getElementById("bellValue").value,
+                emailSummaryEnabled: document.getElementById("emailSummaryEnabled").checked,
+                emailSummaryUnit: document.getElementById("emailSummaryUnit").value,
+                updatedAt: firebase.database.ServerValue.TIMESTAMP
+            };
+            await repo.saveSettings(firebaseUser.uid, prefs);
+            userSettings = { ...userSettings, ...prefs };
+            console.log("Preferencias de resumen actualizadas");
+          }
 
         // Actualizar la interfaz global
         updateProfileUI({
             displayName: newName,
             photoURL: currentPhotoURL
         });
-
+  
         // Cerrar modal
         const modalInstance = bootstrap.Modal.getInstance(document.getElementById("profileSettingsModal"));
         if (modalInstance) modalInstance.hide();
